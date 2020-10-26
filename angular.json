@@ -123,6 +123,10 @@
           }
         }
       }
-    }},
-  "defaultProject": "neuro-imaging-angular"
+    }
+  },
+  "defaultProject": "neuro-imaging-angular",
+  "cli": {
+    "analytics": "d7511c9c-54c0-4a49-ba2b-7b1dd0057b43"
+  }
 }

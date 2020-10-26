@@ -1,0 +1,79 @@
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.loading-indicator {
+  border: 8px solid #eeeeee; /* Light grey */
+  border-top: 8px solid #9b9b9b;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1.5s linear infinite;
+}
+
+.dropZone {
+  flex: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropZone label {
+  color: black;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: white;
+  cursor: pointer;
+  box-shadow: rgb(136, 129, 129) 2px 2px;
+}
+
+#metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+  thead {
+    font-weight: bold;
+    font-size: larger;
+    padding: 0 5px;
+  }
+  tr {
+    border-bottom: 1px solid rgb(230, 230, 230);
+  }
+  td {
+    padding: 2px 5px;
+  }
+}
+
+.image-wrapper {
+  width: 440px;
+  height: 440px;
+  position: relative;
+  color: white;
+  display: inline-block;
+  border-style: solid;
+  border-color: black;
+}
+
+.image-inner {
+  width: 440px;
+  height: 440px;
+  top: 0px;
+  left: 0px;
+  position: absolute;
+}
+
+/*! cornerstone - v0.9.0 - 2016-02-03 | (c) 2014 Chris Hafey | https://github.com/chafey/cornerstone */
+.cornerstone-enabled-image {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: default;
+}

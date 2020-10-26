@@ -3,10 +3,12 @@ import { NgModule } from '@angular/core';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { DropFileDirective } from './drop-file.directive';
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    DropFileDirective
   ],
   imports: [
     BrowserModule,
