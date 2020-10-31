@@ -11,7 +11,7 @@ export type RoiData = {
       highlight: boolean;
       active: boolean;
       lines: { x: number; y: number }[];
-    };
+    }[];
   };
   textBox: {
     active: boolean;
@@ -325,7 +325,7 @@ export type CornerstoneModule = {
     y: number,
     width: number,
     height: number
-  ) => any;
+  ) => number[];
   getStoredPixels: (
     element: HTMLElement,
     x: number,

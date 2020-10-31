@@ -90,7 +90,7 @@
           style="width:100px;">Metadata</button>
       </div>
     </div>
-    <div style="flex: 1;overflow: auto;">
+    <div [ngClass]="{'hidden': currentInfoView !== InfoView.Metadata}" style="flex: 1;overflow: auto;">
       <table id="metadata-table" *ngIf="selectedMetadata !== undefined">
         <thead>
           <tr>
@@ -110,6 +110,25 @@
       </table>
       <div *ngIf="selectedMetadata === undefined" style="padding: 0 5px;">
         No metadata available
+      </div>
+    </div>
+    <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;">
+      <div class="row" style="justify-content: space-around;align-items: center;height: 100%;">
+        <canvas id="canvasComp" #canvasComp></canvas>
+        <div class="col">
+          <h4>Distribution</h4>
+          <div id="compChart" style="flex: 1;"></div>
+          <table>
+            <tr>
+              <td>Mean</td>
+              <td>2</td>
+            </tr>
+            <tr>
+              <td>Std.</td>
+              <td>5</td>
+            </tr>
+          </table>
+        </div>
       </div>
     </div>
   </div>

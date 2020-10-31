@@ -14,6 +14,7 @@ import {
   SynchronizerCallback,
 } from './cornerstone-types';
 import { v4 as uuidv4 } from 'uuid';
+import embed, { VisualizationSpec } from 'vega-embed';
 
 const cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
 const cornerstone: CornerstoneModule = _cornerstone;
@@ -129,7 +130,12 @@ const panZoomSynchronizer: SynchronizerCallback = (
   synchronizer.setViewport(targetElement, targetViewport);
 };
 
-const freehandRoiSynchronizer: SynchronizerCallback = (
+const freehandRoiSynchronizer = (callbacks: {
+  onUpdateCompleted: (
+    target: RoiData & { element: HTMLElement },
+    source: RoiData & { element: HTMLElement }
+  ) => void;
+}): SynchronizerCallback => (
   synchronizer,
   targetElement,
   sourceElement,
@@ -157,12 +163,15 @@ const freehandRoiSynchronizer: SynchronizerCallback = (
     ToolName.FreehandRoi
   )?.data;
 
-  const updateImageAndData = (element: HTMLElement, dataList: RoiData[]) => {
+  const updateImageAndDataFactory = (
+    element: HTMLElement,
+    dataList: RoiData[]
+  ) => {
     const image = cornerstone.getImage(element);
     for (const data of dataList) {
       if (data.area > 0.1 || data.canComplete) {
         (_tool as any).updateCachedStats(image, element, data);
-      }else {
+      } else {
         console.log(data);
       }
     }
@@ -215,9 +224,29 @@ const freehandRoiSynchronizer: SynchronizerCallback = (
       // cornerstoneTools.clearToolState(toRemove, ToolName.FreehandRoi);
       // addData(toRemove, data);
     } else {
-      console.log('last');
-      updateImageAndData(targetElement, targetRois);
-      updateImageAndData(sourceElement, sourceRois);
+      const targetImage = cornerstone.getImage(targetElement);
+      const sourceImage = cornerstone.getImage(sourceElement);
+      for (let i = 0; i < targetRois.length; i++) {
+        const data = targetRois[i];
+        const dataSource = sourceRois[i];
+        if (data.area > 0.1 || data.canComplete) {
+          (_tool as any).updateCachedStats(targetImage, targetElement, data);
+          (_tool as any).updateCachedStats(
+            sourceImage,
+            sourceElement,
+            dataSource
+          );
+
+          callbacks.onUpdateCompleted(
+            { ...data, element: targetElement },
+            { ...dataSource, element: sourceElement }
+          );
+        } else {
+          console.log(data);
+        }
+      }
+      cornerstone.updateImage(targetElement);
+      cornerstone.updateImage(sourceElement);
     }
   }
 };
@@ -268,6 +297,171 @@ export class AppComponent {
   @ViewChild('dicomImageRight') _dicomImageRightElem: ElementRef<
     HTMLDivElement
   >;
+  @ViewChild('canvasComp') _canvasCompElem: ElementRef<HTMLCanvasElement>;
+
+  get canvasElem(): HTMLCanvasElement {
+    return this._canvasCompElem?.nativeElement;
+  }
+
+  drawCompCanvas = (
+    target: RoiData & { element: HTMLElement },
+    source: RoiData & { element: HTMLElement }
+  ) => {
+    const canvas = this.canvasElem;
+    if (canvas === undefined) {
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+    console.log(target);
+    const polyBoundingBox = target.polyBoundingBox;
+    const right = target.handles.points.reduce((p, c) => Math.max(p, c.x), 0);
+    const left = target.handles.points.reduce(
+      (p, c) => Math.min(p, c.x),
+      Number.MAX_VALUE
+    );
+    const width = Math.floor(right - left);
+    const bottom = target.handles.points.reduce((p, c) => Math.max(p, c.y), 0);
+    const top = target.handles.points.reduce(
+      (p, c) => Math.min(p, c.y),
+      Number.MAX_VALUE
+    );
+    const height = Math.floor(bottom - top);
+
+    const CELL_SIZE = 1;
+
+    const targetPixels = cornerstone.getPixels(
+      target.element,
+      left,
+      top,
+      width,
+      height
+    );
+    console.log(targetPixels);
+    console.log(polyBoundingBox);
+    console.log(width);
+    console.log(height);
+    const maxValue = targetPixels.reduce((m, c) => Math.max(m, c), 0);
+    const minValue = targetPixels.reduce(
+      (m, c) => Math.min(m, c),
+      Number.MAX_VALUE
+    );
+    console.log(minValue);
+    console.log(maxValue);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.beginPath();
+    ctx.fillStyle = '#CCCCCC';
+
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        const index = row * width + col;
+        // ctx.fillStyle = cells[index] == Cell.Dead ? DEAD_COLOR : ALIVE_COLOR;
+        const opacity = Math.floor(
+          ((maxValue - (targetPixels[index] - minValue)) * 254) /
+            (maxValue - minValue)
+        );
+        if (isNaN(opacity)) {
+          console.log(
+            ((maxValue - (targetPixels[index] - minValue)) * 254) /
+              (maxValue - minValue)
+          );
+          console.log(targetPixels[index]);
+        }
+
+        ctx.fillStyle = '#000000' + opacity.toString(16);
+        ctx.fillRect(
+          col * CELL_SIZE * 2,
+          row * CELL_SIZE,
+          CELL_SIZE * 2,
+          CELL_SIZE
+        );
+      }
+    }
+    ctx.stroke();
+
+    const sourcePixels = cornerstone.getPixels(
+      source.element,
+      left,
+      top,
+      width,
+      height
+    );
+
+    const targetPos =
+      target.element.id === this.imageDataLeft.getElement().id
+        ? 'Left'
+        : 'Right';
+    const sourcePos =
+      source.element.id === this.imageDataLeft.getElement().id
+        ? 'Left'
+        : 'Right';
+
+    const data = targetPixels.map((p, index) => ({
+      t: p,
+      s: sourcePixels[index],
+    }));
+
+    const data2 = [
+      ...targetPixels.map((p, index) => ({
+        intensity: p,
+        type: targetPos,
+      })),
+      ...sourcePixels.map((p, index) => ({
+        intensity: p,
+        type: sourcePos,
+      })),
+    ];
+
+    const spec: VisualizationSpec = {
+      width: 600,
+      data: {
+        values: data2,
+      },
+      mark: 'bar',
+      encoding: {
+        x: { field: 'intensity', bin: true },
+        y: {
+          aggregate: 'count',
+          stack: null,
+        },
+        color: {
+          field: 'type',
+          scale: { range: ['#675193', '#ca8861'] },
+        },
+        opacity: { value: 0.7 },
+      },
+    };
+
+    // layer: [
+    //   {
+    //     mark: 'bar',
+    //     encoding: {
+    //       x: {
+    //         bin: true,
+    //         field: 't',
+    //       },
+    //       y: { aggregate: 'count' },
+    //       opacity: { value: 0.7 },
+    //       color: { value: '#ca8861' },
+    //     },
+    //   },
+    //   {
+    //     mark: 'bar',
+    //     encoding: {
+    //       x: {
+    //         bin: true,
+    //         field: 's',
+    //       },
+    //       y: { aggregate: 'count' },
+    //       opacity: { value: 0.7 },
+    //       color: { value: '#675193' },
+    //     },
+    //   },
+    // ]
+
+    embed('#compChart', spec);
+  };
 
   uploadFile = (fileList: FileList, data: ImageData): void => {
     const files: File[] = [];
@@ -434,7 +628,7 @@ export class AppComponent {
 
       const synchronizerFreehandRoi = new cornerstoneTools.Synchronizer(
         'click',
-        freehandRoiSynchronizer
+        freehandRoiSynchronizer({ onUpdateCompleted: this.drawCompCanvas })
       );
 
       for (const { getElement } of [this.imageDataLeft, this.imageDataRight]) {
