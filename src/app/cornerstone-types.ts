@@ -226,9 +226,17 @@ export type CornerstoneToolsModule = {
 };
 
 type Offset = { x: number; y: number };
+// Look Up Table
+type LUT = {
+  firstValueMapped: number;
+  numBitsPerEntry: number;
+  lut: Array<any>;
+};
 
-type Viewport = {
-  colormap?: any;
+type CornerstoneViewport = {
+  scale: number;
+  translation: Offset;
+  voi: { windowWidth: number; windowCenter: number };
   displayedArea: {
     tlhc: Offset;
     brhc: Offset;
@@ -236,39 +244,55 @@ type Viewport = {
     columnPixelSpacing: number;
     presentationSizeMode: string;
   };
-  hflip: boolean;
   invert: boolean;
-  labelmap: boolean;
-  modalityLUT?: any;
   pixelReplication: boolean;
-  rotation: number;
-  scale: number;
-  translation: Offset;
+  hflip: boolean;
   vflip: boolean;
-  voi: { windowWidth: number; windowCenter: number };
-  voiLUT?: any;
+  rotation: number;
+
+  modalityLUT?: LUT;
+  voiLUT?: LUT;
+  labelmap: boolean;
+  colormap?: any;
 };
 
-type CornerstoneImage = {
-  cachedLut: any;
-  color: boolean;
-  columnPixelSpacing: number;
-  columns: number;
-  data?: any;
-  decodeTimeInMS: number;
-  floatPixelData?: any;
-  getPixelData: () => any;
-  height: number;
+export type CornerstoneImage = {
   imageId: string;
-  intercept: number;
-  invert: boolean;
-  maxPixelValue: number;
   minPixelValue: number;
-  rowPixelSpacing: number;
-  rows: number;
-  sharedCacheKey?: string;
-  sizeInBytes: number;
+  maxPixelValue: number;
+  windowCenter: number;
+  windowWidth: number;
   slope: number;
+  intercept: number;
+
+  getPixelData: () => number[];
+  // function a function that returns a canvas imageData object for the image. This is only needed for color images
+  getImageData?: () => Uint8Array;
+  // function a function that returns a canvas element with the image loaded into it. This is only needed for color images.
+  getCanvas?: () => HTMLCanvasElement;
+  // function a function that returns a JavaScript Image object with the image data.
+  // This is optional and typically used for images encoded in standard web JPEG and PNG formats
+  getImage?: () => typeof Image;
+  rows: number;
+  columns: number;
+  height: number;
+  width: number;
+
+  color: boolean;
+  lut?: LUT;
+  rgba?: boolean;
+  colormap?: string;
+
+  columnPixelSpacing: number;
+  rowPixelSpacing: number;
+  invert: boolean;
+  sizeInBytes: number;
+  data?: any;
+  floatPixelData?: any;
+  sharedCacheKey?: string;
+  cachedLut: any;
+  falseColor?: boolean;
+  labelmap?: boolean;
   stats: {
     lastGetPixelDataTime: number;
     lastStoredPixelDataToCanvasImageDataTime: number;
@@ -276,19 +300,29 @@ type CornerstoneImage = {
     lastRenderTime: number;
     lastLutGenerateTime: number;
   };
+  decodeTimeInMS: number;
   loadTimeInMS?: number;
   totalTimeInMS?: number;
-  width: number;
-  windowCenter: number;
-  windowWidth: number;
 };
 
-type CornerstoneLayer = {};
+type CornerstoneLayer = {
+  element: HTMLElement; // The DOM element which has been enabled for use by Cornerstone
+  image?: CornerstoneImage; // The image currently displayed in the enabledElement
+  viewport?: CornerstoneViewport; // The current viewport settings of the enabledElement
+  canvas?: HTMLCanvasElement; // The current canvas for this enabledElement
+  options?: object; // Layer drawing options
+  invalid: boolean; // Whether or not the image pixel data underlying the enabledElement has been changed, necessitating a redraw
+  needsRedraw: boolean; // Boolean
+};
 
 export type CornerstoneModule = {
   EVENTS: object;
   addEnabledElement: ElementCallback;
-  addLayer: (element: HTMLElement, image, options?) => void;
+  addLayer: (
+    element: HTMLElement,
+    image: CornerstoneImage,
+    options?: object
+  ) => string;
   canvasToPixel: (element: HTMLElement, pt) => any;
   colors: object;
   convertImageToFalseColorImage: (image, colormap) => void;
@@ -310,14 +344,17 @@ export type CornerstoneModule = {
     voiLUT
   ) => any;
   getActiveLayer: (element: HTMLElement) => any;
-  getDefaultViewport: (canvas, image) => Viewport;
-  getDefaultViewportForImage: (element: HTMLElement, image) => Viewport;
+  getDefaultViewport: (canvas, image) => CornerstoneViewport;
+  getDefaultViewportForImage: (
+    element: HTMLElement,
+    image
+  ) => CornerstoneViewport;
   getElementData: (element: HTMLElement, dataType) => any;
   getEnabledElement: (element: HTMLElement) => any;
   getEnabledElements: () => HTMLElement[];
   getEnabledElementsByImageId: (imageId: string) => HTMLElement[];
   getImage: (element: HTMLElement) => CornerstoneImage;
-  getLayer: (element: HTMLElement, layerId) => CornerstoneLayer;
+  getLayer: (element: HTMLElement, layerId: string) => CornerstoneLayer;
   getLayers: (element: HTMLElement) => CornerstoneLayer[];
   getPixels: (
     element: HTMLElement,
@@ -333,7 +370,7 @@ export type CornerstoneModule = {
     width: number,
     height: number
   ) => any;
-  getViewport: (element: HTMLElement) => Viewport;
+  getViewport: (element: HTMLElement) => CornerstoneViewport;
   getVisibleLayers: (element: HTMLElement) => CornerstoneLayer[];
   imageCache: object;
   internal: object;
@@ -350,19 +387,32 @@ export type CornerstoneModule = {
   registerUnknownImageLoader: (imageLoader) => void;
   removeElementData: (element: HTMLElement, dataType) => void;
   removeLayer: (element: HTMLElement, layerId) => void;
-  renderColorImage: (enabledElement: HTMLElement, invalidated) => void;
-  renderGrayscaleImage: (enabledElement: HTMLElement, invalidated) => void;
-  renderLabelMapImage: (enabledElement: HTMLElement, invalidated) => void;
-  renderPseudoColorImage: (enabledElement: HTMLElement, invalidated) => void;
+  renderColorImage: (enabledElement: HTMLElement, invalidated: boolean) => void;
+  renderGrayscaleImage: (
+    enabledElement: HTMLElement,
+    invalidated: boolean
+  ) => void;
+  renderLabelMapImage: (
+    enabledElement: HTMLElement,
+    invalidated: boolean
+  ) => void;
+  renderPseudoColorImage: (
+    enabledElement: HTMLElement,
+    invalidated: boolean
+  ) => void;
   renderToCanvas: (canvas, image) => void;
-  renderWebImage: (enabledElement: HTMLElement, invalidated) => void;
+  renderWebImage: (enabledElement: HTMLElement, invalidated: boolean) => void;
   rendering: object;
   reset: ElementCallback;
   resize: (element: HTMLElement, forceFitToWindow) => void;
   restoreImage: (image) => void;
   setActiveLayer: (element: HTMLElement, layerId) => void;
-  setDefaultViewport: (viewport: Viewport) => void;
-  setLayerImage: (element: HTMLElement, image, layerId) => void;
+  setDefaultViewport: (viewport: CornerstoneViewport) => void;
+  setLayerImage: (
+    element: HTMLElement,
+    image: CornerstoneImage,
+    layerId: string
+  ) => void;
   setToPixelCoordinateSystem: (
     enabledElement: HTMLElement,
     context,
