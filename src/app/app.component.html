@@ -31,7 +31,7 @@
   <div class="row" style="justify-content: center;">
     <div oncontextmenu='return false;' class="disable-selection noIbar image-wrapper" unselectable='on'
       onselectstart='return false;' onmousedown='return false;'>
-      <div id="dicomImageLeft" class="image-inner" #dicomImageLeft>
+      <div id="dicomImageLeft" class="image-inner" #dicomImageLeft tabindex="0">
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataLeft)" appDropFile
           *ngIf="imageDataLeft.loaded === false && imageDataLeft.loading === false">
           <label>
@@ -49,7 +49,7 @@
     </div>
     <div oncontextmenu='return false;' class="disable-selection noIbar image-wrapper" unselectable='on'
       onselectstart='return false;' onmousedown='return false;'>
-      <div id="dicomImageRight" class="image-inner" #dicomImageRight>
+      <div id="dicomImageRight" class="image-inner" #dicomImageRight tabindex="0">
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataRight)" appDropFile
           *ngIf="imageDataRight.loaded === false && imageDataRight.loading === false">
           <label>

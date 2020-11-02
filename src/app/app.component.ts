@@ -392,7 +392,7 @@ export class AppComponent {
       );
 
       const synchronizerFreehandRoi = new cornerstoneTools.Synchronizer(
-        'click',
+        'click keydown',
         this.cornerstoneService.freehandRoiSynchronizer({
           onUpdateCompleted: this.drawCompCanvas,
         })
@@ -403,6 +403,14 @@ export class AppComponent {
         synchronizer.add(el);
         synchronizerStack.add(el);
         synchronizerFreehandRoi.add(el);
+        el.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            (cornerstoneTools.getToolForElement(
+              el,
+              ToolName.FreehandRoi
+            ) as any).cancelDrawing(el);
+          }
+        });
       }
 
       (window as any).synchronizer = synchronizer;
