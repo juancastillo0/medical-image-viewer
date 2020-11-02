@@ -375,10 +375,6 @@ export class AppComponent {
       element,
       firstImage
     );
-    // document.getElementById("toggleModalityLUT").checked =
-    //   viewport.modalityLUT !== undefined;
-    // document.getElementById("toggleVOILUT").checked =
-    //   viewport.voiLUT !== undefined;
     cornerstone.displayImage(element, firstImage, viewport);
 
     cornerstoneTools.addStackStateManager(element, ['stack']);
