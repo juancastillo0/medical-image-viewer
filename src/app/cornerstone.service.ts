@@ -42,6 +42,8 @@ export const getToolFromName = (toolName: ToolName): any => {
   return toolNameToTool[toolName];
 };
 
+(window as any).getToolFromName = getToolFromName;
+
 @Injectable({
   providedIn: 'root',
 })
@@ -136,12 +138,14 @@ export class CornerstoneService {
       target: RoiData & { element: HTMLElement },
       source: RoiData & { element: HTMLElement }
     ) => void;
-  }): SynchronizerCallback => (
+  }): SynchronizerCallback => async (
     synchronizer,
     targetElement,
     sourceElement,
     eventData
   ) => {
+    targetElement.focus();
+    await new Promise((resolve) => setTimeout(resolve, 10));
     if (targetElement === sourceElement) {
       return;
     }
@@ -192,14 +196,12 @@ export class CornerstoneService {
       for (const data of dataList) {
         const newData = { ...data };
         newData.uuid = uuidv4();
-        if (ratio !== 1) {
-          newData.handles = { ...newData.handles };
-          newData.handles.points = newData.handles.points.map((p) => ({
-            ...p,
-            x: p.x * ratio,
-            y: p.y * ratio,
-          }));
-        }
+        newData.handles = { ...newData.handles };
+        newData.handles.points = newData.handles.points.map((p) => ({
+          ...p,
+          x: p.x * ratio,
+          y: p.y * ratio,
+        }));
 
         cornerstoneTools.addToolState(element, ToolName.FreehandRoi, newData);
         if (newData.canComplete || data.area > 0.1) {
@@ -215,8 +217,10 @@ export class CornerstoneService {
 
     if (!!sourceRois || !!targetRois) {
       if (!sourceRois) {
+        console.log('add to source');
         addData(sourceElement, targetRois);
       } else if (!targetRois) {
+        console.log('add to target');
         addData(targetElement, sourceRois);
       } else if (sourceRois.length !== targetRois.length) {
         // if (targetRois.length > sourceRois.length) {
@@ -247,13 +251,11 @@ export class CornerstoneService {
         for (let i = 0; i < targetRois.length; i++) {
           const dataTarget = targetRois[i];
           const dataSource = sourceRois[i];
-          if (ratio !== 1) {
-            dataSource.handles.points = dataTarget.handles.points.map((p) => ({
-              ...p,
-              x: p.x * ratio,
-              y: p.y * ratio,
-            }));
-          }
+          dataSource.handles.points = dataTarget.handles.points.map((p) => ({
+            ...p,
+            x: p.x * ratio,
+            y: p.y * ratio,
+          }));
           if (dataTarget.area > 0.1 || dataTarget.canComplete) {
             (_tool as any).updateCachedStats(
               targetImage,
