@@ -204,7 +204,7 @@ export class AppComponent {
   drawHistogram = (leftPixels: number[], rightPixels: number[]): void => {
     const difference = leftPixels.map((p, index) => p - rightPixels[index]);
 
-    const data2 = [
+    const data = [
       ...leftPixels.map((p) => ({
         intensity: p,
         type: 'Left',
@@ -218,20 +218,39 @@ export class AppComponent {
     const spec: VisualizationSpec = {
       width: 600,
       data: {
-        values: data2,
+        values: data,
       },
       mark: 'bar',
+      transform: [
+        { bin: true, field: 'intensity', as: 'Binned', groupby: ['type'] },
+        {
+          aggregate: [{ op: 'count', field: 'Binned', as: 'Count' }],
+          groupby: ['type', 'Binned', 'Binned_end'],
+        },
+        {
+          joinaggregate: [{ op: 'sum', field: 'Count', as: 'TotalCount' }],
+          groupby: ['type'],
+        },
+        {
+          calculate: 'datum.Count/datum.TotalCount',
+          as: 'RelativeCount',
+          groupby: ['type'],
+        },
+      ],
       encoding: {
-        x: { field: 'intensity', bin: true },
+        x: { bin: { binned: true }, field: 'Binned', type: 'quantitative' },
+        x2: {
+          field: 'Binned_end',
+        },
         y: {
-          aggregate: 'count',
-          stack: null,
+          field: 'RelativeCount',
+          type: 'quantitative',
         },
         color: {
           field: 'type',
           scale: { range: ['#675193', '#ca8861'] },
         },
-        opacity: { value: 0.7 },
+        opacity: { value: 0.6 },
       },
     };
 
@@ -380,7 +399,6 @@ export class AppComponent {
   _setUpTools = (element: HTMLDivElement): void => {
     cornerstone.enable(element);
 
-    let tool: any;
     if (this.allLoaded) {
       const synchronizer: Synchronizer = new cornerstoneTools.Synchronizer(
         'cornerstoneimagerendered',
