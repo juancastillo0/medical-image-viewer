@@ -10,6 +10,7 @@ import {
   ToolName,
   cornerstoneNIFTIImageLoader,
   cornerstoneWADOImageLoader,
+  getToolFromName,
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
 import { getBoundingBox } from './utils';
@@ -30,10 +31,6 @@ type ImageData = {
   loaded: boolean;
   parsingResult?: ParsingResult;
   getElement: () => HTMLDivElement;
-};
-
-const _getToolName = (_tool: any): string => {
-  return (_tool.name as string).slice(0, _tool.name.length - 4);
 };
 
 enum InfoView {
@@ -287,12 +284,9 @@ export class AppComponent {
         cornerstoneTools.setToolActive(this.defaultTool, {
           mouseButtonMask: 1,
         });
-        cornerstoneTools.setToolActive(
-          _getToolName(cornerstoneTools.WwwcTool),
-          {
-            mouseButtonMask: 4,
-          }
-        );
+        cornerstoneTools.setToolActive(ToolName.Wwwc, {
+          mouseButtonMask: 4,
+        });
       }
     }
   };
@@ -412,48 +406,61 @@ export class AppComponent {
       }
 
       (window as any).synchronizer = synchronizer;
-      tool = cornerstoneTools.PanTool;
-      cornerstoneTools.addTool(tool);
-      cornerstoneTools.setToolActive(_getToolName(tool), {
-        mouseButtonMask: 1,
-        synchronizationContext: synchronizer,
-      });
 
-      tool = cornerstoneTools.ZoomTool;
-      cornerstoneTools.addTool(tool);
-      cornerstoneTools.setToolActive(_getToolName(tool), {
-        mouseButtonMask: 2,
-        synchronizationContext: synchronizer,
-      });
-
-      tool = cornerstoneTools.StackScrollMouseWheelTool;
-      cornerstoneTools.addTool(tool);
-      cornerstoneTools.setToolActive(_getToolName(tool), {
-        synchronizationContext: synchronizerStack,
-      });
-
-      tool = cornerstoneTools.FreehandRoiTool;
-      cornerstoneTools.addTool(tool, {
-        synchronizationContext: synchronizerFreehandRoi,
-      });
+      this.configureTools([
+        {
+          name: ToolName.Pan,
+          options: {
+            mouseButtonMask: 1,
+            synchronizationContext: synchronizer,
+          },
+        },
+        {
+          name: ToolName.Zoom,
+          options: {
+            mouseButtonMask: 2,
+            synchronizationContext: synchronizer,
+          },
+        },
+        {
+          name: ToolName.StackScrollMouseWheel,
+          options: {
+            synchronizationContext: synchronizerStack,
+          },
+        },
+        {
+          name: ToolName.FreehandRoi,
+          options: {
+            synchronizationContext: synchronizerFreehandRoi,
+          },
+        },
+      ]);
     }
 
     const _toolsData = [
-      { tool: cornerstoneTools.PanTool, options: { mouseButtonMask: 1 } },
-      { tool: cornerstoneTools.ZoomTool, options: { mouseButtonMask: 2 } },
-      { tool: cornerstoneTools.WwwcTool, options: { mouseButtonMask: 4 } },
-      { tool: cornerstoneTools.StackScrollMouseWheelTool, options: {} },
-      { tool: cornerstoneTools.ProbeTool, options: {}, active: false },
-      { tool: cornerstoneTools.FreehandRoiTool, options: {}, active: false },
+      { name: ToolName.Pan, options: { mouseButtonMask: 1 } },
+      { name: ToolName.Zoom, options: { mouseButtonMask: 2 } },
+      { name: ToolName.Wwwc, options: { mouseButtonMask: 4 } },
+      { name: ToolName.StackScrollMouseWheel, options: {} },
+      { name: ToolName.Probe, options: {}, active: false },
+      { name: ToolName.FreehandRoi, options: {}, active: false },
     ];
 
-    for (const toolData of _toolsData) {
-      cornerstoneTools.addTool(toolData.tool);
-      if (toolData.active ?? true) {
-        cornerstoneTools.setToolActive(
-          _getToolName(toolData.tool),
-          toolData.options
-        );
+    this.configureTools(_toolsData);
+  };
+
+  configureTools = (
+    configs: {
+      name: ToolName;
+      options?: object;
+      active?: boolean;
+    }[]
+  ): void => {
+    for (const config of configs) {
+      const tool = getToolFromName(config.name);
+      cornerstoneTools.addTool(tool);
+      if (config.active ?? true) {
+        cornerstoneTools.setToolActive(config.name, config.options ?? {});
       }
     }
   };

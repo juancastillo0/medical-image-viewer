@@ -24,7 +24,23 @@ export enum ToolName {
   Pan = 'Pan',
   FreehandRoi = 'FreehandRoi',
   Probe = 'Probe',
+  Zoom = 'Zoom',
+  Wwwc = 'Wwwc',
+  StackScrollMouseWheel = 'StackScrollMouseWheel',
 }
+
+const toolNameToTool: { [key in ToolName]: any } = {
+  [ToolName.Pan]: cornerstoneTools.PanTool,
+  [ToolName.FreehandRoi]: cornerstoneTools.FreehandRoiTool,
+  [ToolName.Probe]: cornerstoneTools.ProbeTool,
+  [ToolName.Zoom]: cornerstoneTools.ZoomTool,
+  [ToolName.Wwwc]: cornerstoneTools.WwwcTool,
+  [ToolName.StackScrollMouseWheel]: cornerstoneTools.StackScrollMouseWheelTool,
+};
+
+export const getToolFromName = (toolName: ToolName): any => {
+  return toolNameToTool[toolName];
+};
 
 @Injectable({
   providedIn: 'root',
