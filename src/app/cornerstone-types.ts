@@ -164,8 +164,8 @@ export type CornerstoneToolsModule = {
   getToolState: (element: HTMLElement, toolName: string) => any;
   globalFrameOfReferenceSpecificToolStateManager: object;
   globalImageIdSpecificToolStateManager: object;
-  import: (uri) => void;
-  importInternal: (uri) => void;
+  import: (uri: string) => any;
+  importInternal: (uri: string) => any;
   init: () => void;
   isToolActiveForElement: (element: HTMLElement, name: string) => void;
   loadHandlerManager: object;
@@ -225,7 +225,7 @@ export type CornerstoneToolsModule = {
   wwwcSynchronizer: SynchronizerCallback;
 };
 
-type Offset = { x: number; y: number };
+export type Offset = { x: number; y: number };
 // Look Up Table
 type LUT = {
   firstValueMapped: number;

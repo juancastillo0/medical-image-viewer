@@ -51,6 +51,11 @@ export class CornerstoneService {
   cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
   cornerstone: CornerstoneModule = _cornerstone;
   cornerstoneMath: any = cornerstoneMath;
+  pointInFreehand = cornerstoneTools.import('util/freehandUtils')
+    .pointInFreehand as (
+    handles: { x: number; y: number }[],
+    point: { x: number; y: number }
+  ) => boolean;
 
   constructor() {
     cornerstoneNIFTIImageLoader.external.cornerstone = cornerstone;

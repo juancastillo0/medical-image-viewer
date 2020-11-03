@@ -2,7 +2,12 @@ import { Component, ElementRef, ViewChild } from '@angular/core';
 import * as dicomParser from 'dicom-parser';
 
 import embed, { VisualizationSpec } from 'vega-embed';
-import { CornerstoneImage, RoiData, Synchronizer } from './cornerstone-types';
+import {
+  CornerstoneImage,
+  Offset,
+  RoiData,
+  Synchronizer,
+} from './cornerstone-types';
 import {
   cornerstone,
   cornerstoneTools,
@@ -33,7 +38,7 @@ type ImageData = {
   getElement: () => HTMLDivElement;
   dynamicImage?: CornerstoneImage;
   layerId?: string;
-  roiBBox: BBox;
+  roiPoints: Offset[];
 };
 
 enum InfoView {
@@ -69,7 +74,7 @@ export class AppComponent {
     loaded: false,
     parsingResult: undefined,
     getElement: () => this._dicomImageLeftElem.nativeElement,
-    roiBBox: getBoundingBox([{ x: 0, y: 0 }]),
+    roiPoints: [],
   };
 
   imageDataRight: ImageData = {
@@ -77,7 +82,7 @@ export class AppComponent {
     loaded: false,
     parsingResult: undefined,
     getElement: () => this._dicomImageRightElem.nativeElement,
-    roiBBox: getBoundingBox([{ x: 0, y: 0 }]),
+    roiPoints: [],
   };
 
   get allLoaded(): boolean {
@@ -137,6 +142,7 @@ export class AppComponent {
     if (canvas === undefined) {
       return;
     }
+
     const ctx = canvas.getContext('2d');
     console.log(target);
     const polyBoundingBox = target.polyBoundingBox;
@@ -208,10 +214,15 @@ export class AppComponent {
     );
 
     if (target.element.id === this.imageDataLeft.getElement().id) {
-      this.imageDataRight.roiBBox = sourceBBox;
+      this.imageDataRight.roiPoints = source.handles.points;
+      this.imageDataLeft.roiPoints = target.handles.points;
+
       cornerstone.updateImage(this.imageDataRight.getElement(), true);
       this.drawHistogram(targetPixels, sourcePixels);
     } else {
+      this.imageDataRight.roiPoints = target.handles.points;
+      this.imageDataLeft.roiPoints = source.handles.points;
+
       this.drawHistogram(sourcePixels, targetPixels);
     }
   };
@@ -475,7 +486,11 @@ export class AppComponent {
       let index = 0;
       for (let y = 0; y < image.height; y++) {
         for (let x = 0; x < image.width; x++) {
-          if (pointInBBox({ x, y }, data.roiBBox)) {
+          const inFreehand = this.cornerstoneService.pointInFreehand(
+            data.roiPoints,
+            { x, y }
+          );
+          if (inFreehand) {
             rawPixels[index] = 255;
           } else {
             rawPixels[index] = 0;
