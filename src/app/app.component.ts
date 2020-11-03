@@ -13,7 +13,7 @@ import {
   getToolFromName,
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
-import { getBoundingBox } from './utils';
+import { BBox, getBoundingBox, pointInBBox } from './utils';
 
 type ParsingResult =
   | {
@@ -31,11 +31,19 @@ type ImageData = {
   loaded: boolean;
   parsingResult?: ParsingResult;
   getElement: () => HTMLDivElement;
+  dynamicImage?: CornerstoneImage;
+  layerId?: string;
+  roiBBox: BBox;
 };
 
 enum InfoView {
   Comparison = 'Comparison',
   Metadata = 'Metadata',
+}
+
+enum HistogramType {
+  dist,
+  diff,
 }
 
 @Component({
@@ -46,6 +54,7 @@ enum InfoView {
 export class AppComponent {
   ToolName = ToolName;
   InfoView = InfoView;
+  HistogramType = HistogramType;
 
   constructor(
     private cornerstoneService: CornerstoneService,
@@ -60,6 +69,7 @@ export class AppComponent {
     loaded: false,
     parsingResult: undefined,
     getElement: () => this._dicomImageLeftElem.nativeElement,
+    roiBBox: getBoundingBox([{ x: 0, y: 0 }]),
   };
 
   imageDataRight: ImageData = {
@@ -67,6 +77,7 @@ export class AppComponent {
     loaded: false,
     parsingResult: undefined,
     getElement: () => this._dicomImageRightElem.nativeElement,
+    roiBBox: getBoundingBox([{ x: 0, y: 0 }]),
   };
 
   get allLoaded(): boolean {
@@ -76,6 +87,8 @@ export class AppComponent {
   // METADATA
 
   currentInfoView: InfoView = InfoView.Metadata;
+
+  selectedHistogram: HistogramType = HistogramType.dist;
   isLeftSelected = true;
   get selectedMetadata(): ParsingResult | undefined {
     return this.isLeftSelected
@@ -195,6 +208,8 @@ export class AppComponent {
     );
 
     if (target.element.id === this.imageDataLeft.getElement().id) {
+      this.imageDataRight.roiBBox = sourceBBox;
+      cornerstone.updateImage(this.imageDataRight.getElement(), true);
       this.drawHistogram(targetPixels, sourcePixels);
     } else {
       this.drawHistogram(sourcePixels, targetPixels);
@@ -202,8 +217,6 @@ export class AppComponent {
   };
 
   drawHistogram = (leftPixels: number[], rightPixels: number[]): void => {
-    const difference = leftPixels.map((p, index) => p - rightPixels[index]);
-
     const data = [
       ...leftPixels.map((p) => ({
         intensity: p,
@@ -215,7 +228,7 @@ export class AppComponent {
       })),
     ];
 
-    const spec: VisualizationSpec = {
+    const specDist: VisualizationSpec = {
       width: 600,
       data: {
         values: data,
@@ -254,7 +267,26 @@ export class AppComponent {
       },
     };
 
-    embed('#compChart', spec);
+    embed('#distChart', specDist);
+
+    const specDiff: VisualizationSpec = {
+      width: 600,
+      data: {
+        values: leftPixels.map((p, index) => ({
+          delta: p - rightPixels[index],
+        })),
+      },
+      mark: 'bar',
+      encoding: {
+        x: { field: 'delta', bin: true },
+        y: {
+          aggregate: 'count',
+          stack: null,
+        },
+      },
+    };
+
+    embed('#diffChart', specDiff);
   };
 
   uploadFile = (fileList: FileList, data: ImageData): void => {
@@ -384,16 +416,75 @@ export class AppComponent {
       data.loaded = true;
       this._setUpTools(element);
     }
-    const viewport = cornerstone.getDefaultViewportForImage(
-      element,
-      firstImage
-    );
-    cornerstone.displayImage(element, firstImage, viewport);
+
+    // const viewport = cornerstone.getDefaultViewportForImage(
+    //   element,
+    //   firstImage
+    // );
+    console.log(firstImage);
+    cornerstone.addLayer(element, firstImage, {});
+
+    if (this.allLoaded) {
+      data.dynamicImage = {
+        imageId: 'notneeded',
+        minPixelValue: 0,
+        maxPixelValue: 255,
+        slope: 1.0,
+        intercept: 0,
+        windowCenter: firstImage.width / 2,
+        windowWidth: firstImage.width,
+        getPixelData: this.createGetPixelData(data),
+        rows: firstImage.rows,
+        columns: firstImage.columns,
+        height: firstImage.height,
+        width: firstImage.width,
+        color: false,
+        columnPixelSpacing: firstImage.columnPixelSpacing,
+        rowPixelSpacing: firstImage.rowPixelSpacing,
+        invert: false,
+        sizeInBytes: firstImage.height * firstImage.width * 2,
+        data: {
+          opacity: 0.5,
+          rawPixels: new Uint16Array(firstImage.height * firstImage.width),
+        },
+      };
+      data.layerId = cornerstone.addLayer(element, data.dynamicImage, {
+        opacity: 0.7,
+        viewport: {
+          colormap: 'hotIron',
+          voi: {
+            windowWidth: 30,
+            windowCenter: 16,
+          },
+        },
+      });
+    }
 
     cornerstoneTools.addStackStateManager(element, ['stack']);
     cornerstoneTools.addToolState(element, 'stack', stack);
+    cornerstone.updateImage(element);
 
     data.loading = false;
+  };
+
+  createGetPixelData = (data: ImageData): (() => number[]) => {
+    return () => {
+      const image = data.dynamicImage;
+      const rawPixels = image.data.rawPixels as Uint16Array;
+
+      let index = 0;
+      for (let y = 0; y < image.height; y++) {
+        for (let x = 0; x < image.width; x++) {
+          if (pointInBBox({ x, y }, data.roiBBox)) {
+            rawPixels[index] = 255;
+          } else {
+            rawPixels[index] = 0;
+          }
+          index++;
+        }
+      }
+      return rawPixels as any;
+    };
   };
 
   _setUpTools = (element: HTMLDivElement): void => {
@@ -494,6 +585,10 @@ export class AppComponent {
   selectMetadata = (isLeft: boolean) => {
     this.isLeftSelected = isLeft;
     this._updateMetadata();
+  };
+
+  selectHistogram = (histType: HistogramType) => {
+    this.selectedHistogram = histType;
   };
 
   onSearchInput = (inputStr: string) => {

@@ -290,17 +290,17 @@ export type CornerstoneImage = {
   data?: any;
   floatPixelData?: any;
   sharedCacheKey?: string;
-  cachedLut: any;
+  cachedLut?: any;
   falseColor?: boolean;
   labelmap?: boolean;
-  stats: {
+  stats?: {
     lastGetPixelDataTime: number;
     lastStoredPixelDataToCanvasImageDataTime: number;
     lastPutImageDataTime: number;
     lastRenderTime: number;
     lastLutGenerateTime: number;
   };
-  decodeTimeInMS: number;
+  decodeTimeInMS?: number;
   loadTimeInMS?: number;
   totalTimeInMS?: number;
 };
@@ -437,6 +437,6 @@ export type CornerstoneModule = {
     canvasImageDataData
   ) => any;
   triggerEvent: (el, type) => void;
-  updateImage: (element: HTMLElement) => void;
+  updateImage: (element: HTMLElement, invalidated?: boolean) => void;
   webGL: object;
 };

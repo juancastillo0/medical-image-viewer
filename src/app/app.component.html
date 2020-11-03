@@ -69,7 +69,8 @@
   </div>
   <div style="flex:1;" class="col">
     <div class="row" style="justify-content: space-between;">
-      <div class="row" style="justify-content: space-between;flex: 1;">
+      <div class="row" style="justify-content: space-between;flex: 1;"
+        [ngClass]="{'hidden': currentInfoView !== InfoView.Metadata}">
         <div class="row" style="align-items: center;">
           <h2 style="padding: 0 25px 5px 5px;">Metadata</h2>
           <button (click)="selectMetadata(true)" [disabled]="imageDataLeft.loaded === false"
@@ -81,6 +82,18 @@
           <label for="inputSearchMetadata" style="padding-right: 5px;">Search:</label>
           <input type="text" id="inputSearchMetadata" #inputSearchMetadata
             (keyup)="onSearchInput(inputSearchMetadata.value)">
+        </div>
+      </div>
+      <div class="row" style="justify-content: space-between;flex: 1;"
+        [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}">
+        <div class="row" style="align-items: center;">
+          <h2 style="padding: 0 25px 5px 5px;">Comparison</h2>
+          <button (click)="selectHistogram(HistogramType.dist)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogram === HistogramType.dist}">Distribution</button>
+          <button (click)="selectHistogram(HistogramType.diff)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogram === HistogramType.diff}">Difference</button>
         </div>
       </div>
       <div class="row" style="justify-content: flex-end;align-items: center;flex: 1;">
@@ -112,13 +125,18 @@
         No metadata available
       </div>
     </div>
-    <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;">
+    <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;overflow: auto;">
       <div class="row" style="justify-content: space-around;align-items: center;height: 100%;">
         <canvas id="canvasComp" #canvasComp></canvas>
         <div class="col">
           <h4>Distribution</h4>
-          <div id="compChart" style="flex: 1;"></div>
-          <table>
+          <div id="distChart" style="flex: 1;"
+            [style.display]="selectedHistogram === HistogramType.dist ? undefined: 'none'">
+          </div>
+          <div id="diffChart" style="flex: 1;"
+            [style.display]="selectedHistogram === HistogramType.diff ? undefined: 'none'">
+          </div>
+          <!-- <table>
             <tr>
               <td>Mean</td>
               <td>2</td>
@@ -127,7 +145,7 @@
               <td>Std.</td>
               <td>5</td>
             </tr>
-          </table>
+          </table> -->
         </div>
       </div>
     </div>
