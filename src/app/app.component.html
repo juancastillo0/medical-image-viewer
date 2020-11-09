@@ -11,11 +11,16 @@
 
 
 <div class="col">
-  <div class="row" style="padding: 3px 0px; justify-content: space-between; width:600px; align-self: center;">
+  <div class="row" id="top-menu">
     <label class="button">
       <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataLeft)" #fileInput>
       Select Files
     </label>
+    <div class="col">
+      <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
+      <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
+        (change)="updateLayerOpacity(layerOpacityLeft.value, imageDataLeft)" #layerOpacityLeft>
+    </div>
     <div class="row">
       <button (click)="toggleTool(ToolName.Probe)" [ngClass]="{'pressed': enabledTool === ToolName.Probe}">Probe
         Tool</button>
@@ -23,6 +28,20 @@
         [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">ROI Tool</button>
     </div>
     <button (click)="clearTool()">Clear</button>
+    <div class="col">
+      <label for="selectColormap" class="small-label">Colormap</label>
+      <select name="colormap" id="selectColormap" (change)="changeColormap(selectColormap.value)" #selectColormap>
+        <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
+      </select>
+    </div>
+    <select name="select-image" id="selectImage" (change)="changeImage(selectImage.value)" #selectImage>
+      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}} [selected]="false">{{v.key}}</option>
+    </select>
+    <div class="col">
+      <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
+      <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
+        (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
+    </div>
     <label class="button">
       <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataRight)" #fileInput>
       Select Files

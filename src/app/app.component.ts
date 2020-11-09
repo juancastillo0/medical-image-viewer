@@ -3,9 +3,11 @@ import * as dicomParser from 'dicom-parser';
 
 import embed, { VisualizationSpec } from 'vega-embed';
 import {
+  CornerstoneColormap,
   CornerstoneImage,
   Offset,
   RoiData,
+  StackToolState,
   Synchronizer,
 } from './cornerstone-types';
 import {
@@ -31,15 +33,80 @@ type ParsingResult =
       parsingError: string;
     };
 
-type ImageData = {
-  loading: boolean;
-  loaded: boolean;
-  parsingResult?: ParsingResult;
+class ImageData {
+  constructor(getElement: () => HTMLDivElement) {
+    this.getElement = getElement;
+  }
+
+  loading = false;
+  loaded = false;
+  opacity = 0.7;
+  parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
+
   dynamicImage?: CornerstoneImage;
   layerId?: string;
-  roiPoints: Offset[];
-};
+
+  roiPointsByStack: Array<{ [key: string]: Array<Offset> }> = [];
+
+  currentStackPoints = (
+    stackIndex?: number
+  ): { [key: string]: Array<Offset> } | undefined => {
+    if (stackIndex === undefined) {
+      const element = this.getElement();
+      try {
+        const stackState = cornerstoneTools.getToolState(
+          element,
+          'stack'
+        ) as StackToolState;
+        stackIndex = stackState.data[0].currentImageIdIndex;
+      } catch (_) {
+        return undefined;
+      }
+    }
+    return this.roiPointsByStack[stackIndex];
+  };
+
+  setPoints = (
+    stackIndex: number,
+    uuid: string,
+    points: Array<Offset>
+  ): void => {
+    let map = this.roiPointsByStack[stackIndex];
+    if (!map) {
+      map = {};
+      this.roiPointsByStack[stackIndex] = map;
+    }
+    map[uuid] = points;
+  };
+
+  getRoiPixels = (): Array<{
+    pixels: number[];
+    bbox: BBox;
+    points: Array<Offset>;
+  }> => {
+    const pointsMap = this.currentStackPoints();
+
+    if (!pointsMap) {
+      return [];
+    }
+
+    return Object.values(pointsMap).map((points) => {
+      const sourceBBox = getBoundingBox(points);
+      return {
+        pixels: cornerstone.getPixels(
+          this.getElement(),
+          sourceBBox.left,
+          sourceBBox.top,
+          sourceBBox.width,
+          sourceBBox.height
+        ),
+        bbox: sourceBBox,
+        points,
+      };
+    });
+  };
+}
 
 enum InfoView {
   Comparison = 'Comparison',
@@ -60,6 +127,7 @@ export class AppComponent {
   ToolName = ToolName;
   InfoView = InfoView;
   HistogramType = HistogramType;
+  colormaps = cornerstone.colors.getColormapsList();
 
   constructor(
     private cornerstoneService: CornerstoneService,
@@ -68,22 +136,12 @@ export class AppComponent {
 
   readonly defaultTool = ToolName.Pan;
   enabledTool = ToolName.Pan;
+  selectedColormap = CornerstoneColormap.hotIron;
 
-  imageDataLeft: ImageData = {
-    loading: false,
-    loaded: false,
-    parsingResult: undefined,
-    getElement: () => this._dicomImageLeftElem.nativeElement,
-    roiPoints: [],
-  };
+  importedImageIds: Map<string, Array<string>> = new Map();
 
-  imageDataRight: ImageData = {
-    loading: false,
-    loaded: false,
-    parsingResult: undefined,
-    getElement: () => this._dicomImageRightElem.nativeElement,
-    roiPoints: [],
-  };
+  imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement);
+  imageDataRight = new ImageData(() => this._dicomImageRightElem.nativeElement);
 
   get allLoaded(): boolean {
     return this.imageDataLeft.loaded && this.imageDataRight.loaded;
@@ -112,6 +170,39 @@ export class AppComponent {
   get canvasElem(): HTMLCanvasElement {
     return this._canvasCompElem?.nativeElement;
   }
+
+  changeImage = (importedImageId: string) => {};
+
+  changeColormap = (colormapId: CornerstoneColormap) => {
+    this.selectedColormap = colormapId;
+    if (this.allLoaded) {
+      for (const { getElement, layerId } of [
+        this.imageDataLeft,
+        this.imageDataRight,
+      ]) {
+        const layer = cornerstone.getLayer(getElement(), layerId);
+
+        const colormap = cornerstone.colors.getColormap(this.selectedColormap);
+        colormap.setColor(0, [0, 0, 0, 0]);
+
+        layer.viewport.colormap = colormap;
+        cornerstone.updateImage(getElement(), true);
+      }
+    }
+  };
+
+  updateLayerOpacity = (opacity: number, imageData: ImageData) => {
+    imageData.opacity = opacity;
+    if (this.allLoaded) {
+      const layer = cornerstone.getLayer(
+        imageData.getElement(),
+        imageData.layerId
+      );
+
+      layer.options.opacity = imageData.opacity;
+      cornerstone.updateImage(imageData.getElement());
+    }
+  };
 
   drawDeltaMap = () => {
     const layers = [
@@ -213,18 +304,39 @@ export class AppComponent {
       sourceBBox.height
     );
 
-    if (target.element.id === this.imageDataLeft.getElement().id) {
-      this.imageDataRight.roiPoints = source.handles.points;
-      this.imageDataLeft.roiPoints = target.handles.points;
+    const stackState = cornerstoneTools.getToolState(
+      source.element,
+      'stack'
+    ) as StackToolState;
+    const stackIndex = stackState.data[0].currentImageIdIndex;
 
-      cornerstone.updateImage(this.imageDataRight.getElement(), true);
+    if (target.element.id === this.imageDataLeft.getElement().id) {
+      this.imageDataRight.setPoints(
+        stackIndex,
+        source.uuid,
+        source.handles.points
+      );
+      this.imageDataLeft.setPoints(
+        stackIndex,
+        target.uuid,
+        target.handles.points
+      );
       this.drawHistogram(targetPixels, sourcePixels);
     } else {
-      this.imageDataRight.roiPoints = target.handles.points;
-      this.imageDataLeft.roiPoints = source.handles.points;
-
+      this.imageDataRight.setPoints(
+        stackIndex,
+        target.uuid,
+        target.handles.points
+      );
+      this.imageDataLeft.setPoints(
+        stackIndex,
+        source.uuid,
+        source.handles.points
+      );
       this.drawHistogram(sourcePixels, targetPixels);
     }
+    cornerstone.updateImage(this.imageDataLeft.getElement(), true);
+    cornerstone.updateImage(this.imageDataRight.getElement(), true);
   };
 
   drawHistogram = (leftPixels: number[], rightPixels: number[]): void => {
@@ -427,17 +539,21 @@ export class AppComponent {
       data.loaded = true;
       this._setUpTools(element);
     }
+    cornerstoneTools.addStackStateManager(element, ['stack']);
+    cornerstoneTools.addToolState(element, 'stack', stack);
+    this.importedImageIds.set(firstImage.imageId, stack.imageIds);
 
     // const viewport = cornerstone.getDefaultViewportForImage(
     //   element,
     //   firstImage
     // );
     console.log(firstImage);
-    cornerstone.addLayer(element, firstImage, {});
 
-    if (this.allLoaded) {
+    cornerstone.addLayer(element, firstImage, { opacity: 1 });
+
+    if (!data.dynamicImage) {
       data.dynamicImage = {
-        imageId: 'notneeded',
+        imageId: data.getElement().id,
         minPixelValue: 0,
         maxPixelValue: 255,
         slope: 1.0,
@@ -447,6 +563,7 @@ export class AppComponent {
         getPixelData: this.createGetPixelData(data),
         rows: firstImage.rows,
         columns: firstImage.columns,
+        render: cornerstone.renderGrayscaleImage,
         height: firstImage.height,
         width: firstImage.width,
         color: false,
@@ -455,25 +572,48 @@ export class AppComponent {
         invert: false,
         sizeInBytes: firstImage.height * firstImage.width * 2,
         data: {
-          opacity: 0.5,
           rawPixels: new Uint16Array(firstImage.height * firstImage.width),
         },
       };
+      const colormap = cornerstone.colors.getColormap(this.selectedColormap);
+      colormap.setColor(0, [0, 0, 0, 0]);
+
       data.layerId = cornerstone.addLayer(element, data.dynamicImage, {
-        opacity: 0.7,
+        opacity: data.opacity,
         viewport: {
-          colormap: 'hotIron',
-          voi: {
-            windowWidth: 30,
-            windowCenter: 16,
-          },
+          colormap,
+          // voi: {
+          //   windowWidth: 30,
+          //   windowCenter: 16,
+          // },
         },
       });
     }
 
-    cornerstoneTools.addStackStateManager(element, ['stack']);
-    cornerstoneTools.addToolState(element, 'stack', stack);
     cornerstone.updateImage(element);
+
+    element.addEventListener(
+      cornerstoneTools.EVENTS.STACK_SCROLL,
+      async (e) => {
+        const eDetail = (e as any).detail as {
+          newImageIdIndex: number;
+          direction: 1 | -1;
+        };
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        for (const { getElement, currentStackPoints } of [
+          this.imageDataLeft,
+          this.imageDataRight,
+        ]) {
+          if (
+            !!currentStackPoints(eDetail.newImageIdIndex) ||
+            !!currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
+          ) {
+            cornerstone.updateImage(getElement(), true);
+          }
+        }
+      }
+    );
 
     data.loading = false;
   };
@@ -481,23 +621,67 @@ export class AppComponent {
   createGetPixelData = (data: ImageData): (() => number[]) => {
     return () => {
       const image = data.dynamicImage;
-      const rawPixels = image.data.rawPixels as Uint16Array;
+      const rawPixels = new Uint16Array(
+        data.dynamicImage.height * data.dynamicImage.width
+      );
 
-      let index = 0;
-      for (let y = 0; y < image.height; y++) {
-        for (let x = 0; x < image.width; x++) {
-          const inFreehand = this.cornerstoneService.pointInFreehand(
-            data.roiPoints,
-            { x, y }
-          );
-          if (inFreehand) {
-            rawPixels[index] = 255;
-          } else {
-            rawPixels[index] = 0;
+      const leftDataList = this.imageDataLeft.getRoiPixels();
+      const rightDataList = this.imageDataRight.getRoiPixels();
+      console.log('createGetPixelData');
+
+      for (
+        let i = 0;
+        i < Math.min(leftDataList.length, rightDataList.length);
+        i++
+      ) {
+        const leftData = leftDataList[i];
+        const right = rightDataList[i].pixels;
+        const left = leftData.pixels;
+        const bbox = leftData.bbox;
+
+        let index = 0;
+        const differencePixels: [number, number][] = [];
+        let maxDiff = Number.MIN_VALUE;
+        let minDiff = Number.MAX_VALUE;
+        for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
+          for (let x = bbox.left; x < bbox.left + bbox.width; x++) {
+            const inFreehand = this.cornerstoneService.pointInFreehand(
+              leftData.points,
+              { x, y }
+            );
+            if (inFreehand) {
+              const diff = left[index] - right[index];
+              maxDiff = Math.max(maxDiff, diff);
+              minDiff = Math.min(minDiff, diff);
+              differencePixels.push([
+                Math.round(y) * data.dynamicImage.width + Math.round(x),
+                diff,
+              ]);
+            }
+            index++;
           }
-          index++;
+        }
+        for (const [ind, diff] of differencePixels) {
+          const value = Math.floor(
+            ((diff - minDiff) / (maxDiff - minDiff)) * 255
+          );
+          rawPixels[ind] = value;
         }
       }
+
+      // for (const [ind, diff] of differencePixels) {
+      //   const value = Math.floor(
+      //     ((diff - minDiff) / (maxDiff - minDiff)) * 255
+      //   );
+
+      //   const rescaled = value * 3;
+      //   rawPixels[ind * 4] = rescaled < 255 ? rescaled : 255;
+      //   rawPixels[ind * 4 + 1] =
+      //     rescaled > 255 ? (rescaled > 255 * 2 ? 255 : rescaled - 255) : 0;
+      //   rawPixels[ind * 4 + 2] = rescaled > 255 * 2 ? rescaled - 255 * 2 : 0;
+      //   rawPixels[ind * 4 + 3] = 255;
+      // }
+
       return rawPixels as any;
     };
   };

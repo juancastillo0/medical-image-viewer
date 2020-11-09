@@ -68,6 +68,24 @@
   outline: none;
 }
 
+.small-label {
+  font-size: 0.8em;
+}
+
+#top-menu {
+  padding: 3px 0px;
+  justify-content: space-between;
+  width: 950px;
+  align-self: center;
+  select {
+    min-height: 20px;
+    margin-top: 1px;
+  }
+  input[type="range"]{
+    width: 95px
+  }
+}
+
 #canvasComp {
   height: 250px;
   width: 250px;

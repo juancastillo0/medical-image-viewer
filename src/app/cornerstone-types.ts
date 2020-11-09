@@ -1,3 +1,8 @@
+import {
+  CORNERSTONE_EVENTS,
+  CORNERSTONE_TOOLS_EVENTS,
+} from './cornerstone-events';
+
 export type RoiData = {
   active: boolean;
   area: number;
@@ -102,9 +107,18 @@ type CornerstoneTool = {
   updateOnMouseMove: boolean;
 };
 
+export type StackToolState = {
+  data: Array<{
+    currentImageIdIndex: number;
+    imageIds: string[];
+    pending: string[];
+    uuid: string;
+  }>;
+};
+
 export type CornerstoneToolsModule = {
   SaveAs: any;
-  EVENTS: any;
+  EVENTS: typeof CORNERSTONE_TOOLS_EVENTS;
   AngleTool: any;
   ArrowAnnotateTool: any;
   BidirectionalTool: any;
@@ -293,6 +307,7 @@ export type CornerstoneImage = {
   cachedLut?: any;
   falseColor?: boolean;
   labelmap?: boolean;
+  render?: (enabledElement: HTMLElement, invalidated: boolean) => void;
   stats?: {
     lastGetPixelDataTime: number;
     lastStoredPixelDataToCanvasImageDataTime: number;
@@ -310,13 +325,34 @@ type CornerstoneLayer = {
   image?: CornerstoneImage; // The image currently displayed in the enabledElement
   viewport?: CornerstoneViewport; // The current viewport settings of the enabledElement
   canvas?: HTMLCanvasElement; // The current canvas for this enabledElement
-  options?: object; // Layer drawing options
+  options?: any; // Layer drawing options
   invalid: boolean; // Whether or not the image pixel data underlying the enabledElement has been changed, necessitating a redraw
   needsRedraw: boolean; // Boolean
 };
 
+export enum CornerstoneColormap {
+  autumn = 'autumn',
+  blues = 'blues',
+  bone = 'bone',
+  cool = 'cool',
+  coolwarm = 'coolwarm',
+  copper = 'copper',
+  gray = 'gray',
+  hot = 'hot',
+  hotIron = 'hotIron',
+  hotMetalBlue = 'hotMetalBlue',
+  hsv = 'hsv',
+  jet = 'jet',
+  pet = 'pet',
+  pet20Step = 'pet20Step',
+  spectral = 'spectral',
+  spring = 'spring',
+  summer = 'summer',
+  winter = 'winter',
+}
+
 export type CornerstoneModule = {
-  EVENTS: object;
+  EVENTS: typeof CORNERSTONE_EVENTS;
   addEnabledElement: ElementCallback;
   addLayer: (
     element: HTMLElement,
@@ -324,7 +360,11 @@ export type CornerstoneModule = {
     options?: object
   ) => string;
   canvasToPixel: (element: HTMLElement, pt) => any;
-  colors: object;
+  colors: {
+    LookupTable: any;
+    getColormap: (id: CornerstoneColormap, colormapData?: any) => any;
+    getColormapsList: () => { id: CornerstoneColormap; name: string }[];
+  };
   convertImageToFalseColorImage: (image, colormap) => void;
   convertToFalseColorImage: (element: HTMLElement, colormap) => void;
   disable: ElementCallback;
