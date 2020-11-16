@@ -21,7 +21,7 @@ import {
   getToolFromName,
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
-import { BBox, getBoundingBox } from './utils';
+import { BBox, getBoundingBox, roisAreDifferent } from './utils';
 
 setWasmPaths(`${document.location.href}assets/`);
 tf.setBackend('wasm').then((loadedTFWasm) => {
@@ -73,17 +73,20 @@ class ImageData {
 
   roiPointsByStack: Array<{ [key: string]: Array<Offset> }> = [];
 
+  currentStackIndex = (): number => {
+    const stackState = cornerstoneTools.getToolState(
+      this.getElement(),
+      'stack'
+    ) as StackToolState;
+    return stackState.data[0].currentImageIdIndex;
+  };
+
   currentStackPoints = (
     stackIndex?: number
   ): { [key: string]: Array<Offset> } | undefined => {
     if (stackIndex === undefined) {
-      const element = this.getElement();
       try {
-        const stackState = cornerstoneTools.getToolState(
-          element,
-          'stack'
-        ) as StackToolState;
-        stackIndex = stackState.data[0].currentImageIdIndex;
+        stackIndex = this.currentStackIndex();
       } catch (_) {
         return undefined;
       }
@@ -109,7 +112,7 @@ class ImageData {
       map = {};
       this.roiPointsByStack[stackIndex] = map;
     }
-    map[uuid] = points;
+    map[uuid] = points.map((p) => ({ ...p }));
   };
 
   getRoiPixels = (): Array<{
@@ -294,63 +297,61 @@ export class AppComponent {
     target: RoiData & { element: HTMLElement },
     source: RoiData & { element: HTMLElement }
   ) => {
-    console.log(target);
-    const polyBoundingBox = target.polyBoundingBox;
-    const targetBBox = getBoundingBox(target.handles.points);
-    const targetPixels = cornerstone.getPixels(
-      target.element,
-      targetBBox.left,
-      targetBBox.top,
-      targetBBox.width,
-      targetBBox.height
-    );
-
-    console.log(polyBoundingBox);
-    console.log(targetBBox.width);
-    console.log(targetBBox.height);
-
-    this._drawRoiInCanvas(targetPixels, targetBBox);
-
-    const sourceBBox = getBoundingBox(source.handles.points);
-    const sourcePixels = cornerstone.getPixels(
-      source.element,
-      sourceBBox.left,
-      sourceBBox.top,
-      sourceBBox.width,
-      sourceBBox.height
-    );
-
-    const stackState = cornerstoneTools.getToolState(
-      source.element,
-      'stack'
-    ) as StackToolState;
-    const stackIndex = stackState.data[0].currentImageIdIndex;
-
+    let leftRoiData: RoiData & { element: HTMLElement };
+    let rightRoiData: RoiData & { element: HTMLElement };
     if (target.element.id === this.imageDataLeft.getElement().id) {
-      this.imageDataRight.setPoints(
-        stackIndex,
-        source.uuid,
-        source.handles.points
-      );
-      this.imageDataLeft.setPoints(
-        stackIndex,
-        target.uuid,
-        target.handles.points
-      );
-      this.drawHistogram(targetPixels, sourcePixels);
+      leftRoiData = target;
+      rightRoiData = source;
     } else {
-      this.imageDataRight.setPoints(
-        stackIndex,
-        target.uuid,
-        target.handles.points
-      );
-      this.imageDataLeft.setPoints(
-        stackIndex,
-        source.uuid,
-        source.handles.points
-      );
-      this.drawHistogram(sourcePixels, targetPixels);
+      leftRoiData = source;
+      rightRoiData = target;
     }
+
+    const stackIndex = this.imageDataLeft.currentStackIndex();
+    const stackPoints = this.imageDataLeft.currentStackPoints(stackIndex);
+    if (
+      !!stackPoints &&
+      !!stackPoints[leftRoiData.uuid] &&
+      roisAreDifferent(
+        stackPoints[leftRoiData.uuid],
+        leftRoiData.handles.points
+      )
+    ) {
+      console.log('dwddwdwaodwaniw');
+      return;
+    }
+
+    const leftBBox = getBoundingBox(leftRoiData.handles.points);
+    const leftPixels = cornerstone.getPixels(
+      target.element,
+      leftBBox.left,
+      leftBBox.top,
+      leftBBox.width,
+      leftBBox.height
+    );
+
+    // this._drawRoiInCanvas(targetPixels, targetBBox);
+
+    const rightBBox = getBoundingBox(rightRoiData.handles.points);
+    const rightPixels = cornerstone.getPixels(
+      source.element,
+      rightBBox.left,
+      rightBBox.top,
+      rightBBox.width,
+      rightBBox.height
+    );
+
+    this.imageDataRight.setPoints(
+      stackIndex,
+      rightRoiData.uuid,
+      rightRoiData.handles.points
+    );
+    this.imageDataLeft.setPoints(
+      stackIndex,
+      leftRoiData.uuid,
+      leftRoiData.handles.points
+    );
+    this.drawHistogram(leftPixels, rightPixels);
     cornerstone.updateImage(this.imageDataLeft.getElement(), true);
     cornerstone.updateImage(this.imageDataRight.getElement(), true);
   };
@@ -479,6 +480,9 @@ export class AppComponent {
     }
   };
 
+  otherData = (data: ImageData) =>
+    data === this.imageDataLeft ? this.imageDataRight : this.imageDataLeft;
+
   loadAndViewImages = async (
     imageIds: Array<string>,
     data: ImageData
@@ -551,21 +555,16 @@ export class AppComponent {
     if (data.layerId !== undefined) {
       cornerstone.removeLayer(element, data.layerId);
       cornerstone.removeLayer(element, data.overlayLayerId);
-      const previousStackState = cornerstoneTools.getToolState(
-        element,
-        'stack'
-      ) as StackToolState;
-      cornerstoneTools.removeToolState(
-        element,
-        'stack',
-        previousStackState.data[0]
-      );
+      cornerstoneTools.clearToolState(element, 'stack');
     } else {
       cornerstoneTools.addStackStateManager(element, ['stack']);
     }
+    if (this.allLoaded) {
+      stack.currentImageIdIndex = this.otherData(data).currentStackIndex();
+    }
     cornerstoneTools.addToolState(element, 'stack', stack);
-    this.importedImageIds.set(firstImage.imageId, stack.imageIds);
     data.imageId = firstImage.imageId;
+    this.importedImageIds.set(firstImage.imageId, stack.imageIds);
     data.layerId = cornerstone.addLayer(element, firstImage, { opacity: 1 });
 
     // const viewport = cornerstone.getDefaultViewportForImage(
@@ -606,8 +605,13 @@ export class AppComponent {
         colormap,
       },
     });
+
     this.toggleTool(ToolName.FreehandRoi);
     this.toggleTool(ToolName.FreehandRoi);
+    if (this.allLoaded) {
+      cornerstoneTools.clearToolState(element, ToolName.FreehandRoi);
+      this.otherData(data).getElement().click();
+    }
     for (const { loaded, getElement } of [
       this.imageDataLeft,
       this.imageDataRight,
@@ -626,21 +630,73 @@ export class AppComponent {
         };
         await new Promise((resolve) => setTimeout(resolve, 50));
 
-        for (const { getElement, currentStackPoints } of [
-          this.imageDataLeft,
-          this.imageDataRight,
-        ]) {
+        for (const d of [this.imageDataLeft, this.imageDataRight]) {
+          if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
+            return;
+          }
+          const stackPointCurr = d.currentStackPoints(eDetail.newImageIdIndex);
           if (
-            !!currentStackPoints(eDetail.newImageIdIndex) ||
-            !!currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
+            !!stackPointCurr ||
+            !!d.currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
           ) {
-            cornerstone.updateImage(getElement(), true);
+            const elem = d.getElement();
+            this.synchronizeRoiPoints(elem, stackPointCurr ?? {});
+
+            cornerstone.updateImage(elem, true);
           }
         }
       }
     );
+    setTimeout(() => {
+      cornerstone.getLayer(
+        element,
+        data.overlayLayerId
+      ).syncProps.originalScale = cornerstone.getLayer(
+        element,
+        data.layerId
+      ).syncProps.originalScale;
+      cornerstone.updateImage(element);
+    }, 10);
 
     data.loading = false;
+  };
+
+  synchronizeRoiPoints = (
+    elem: HTMLElement,
+    stackPointCurr: { [key: string]: Offset[] }
+  ): boolean => {
+    const state = cornerstoneTools.getToolState(elem, ToolName.FreehandRoi) ?? {
+      data: [],
+    };
+    const cornerstonData = state.data as RoiData[];
+    if (cornerstonData.length > Object.keys(stackPointCurr).length) {
+      cornerstoneTools.clearToolState(elem, ToolName.FreehandRoi);
+      return true;
+    }
+    const map = cornerstonData.reduce((previous, current) => {
+      previous.set(current.uuid, current);
+      return previous;
+    }, new Map<string, RoiData>());
+
+    let result = false;
+    Object.entries(stackPointCurr).map(([key, value]) => {
+      if (!map.has(key)) {
+        result = true;
+        cornerstoneTools.addToolState(
+          elem,
+          ToolName.FreehandRoi,
+          this.cornerstoneService.createRoiData(key, value)
+        );
+      } else {
+        map.get(key).handles.points.forEach((p, index) => {
+          p.x = value[index].x;
+          p.y = value[index].y;
+        });
+        // if (roisAreDifferent(d.handles.points, value)) {
+        // }
+      }
+    });
+    return result;
   };
 
   createGetPixelData = (data: ImageData): (() => number[]) => {
@@ -660,8 +716,6 @@ export class AppComponent {
         const right = rightDataList[i].pixels;
         const left = leftData.pixels;
         const bbox = leftData.bbox;
-        console.log(left.length, right.length);
-        console.log(leftDataList[i].bbox, rightDataList[i].bbox);
 
         let index = 0;
         const differencePixels: [number, number][] = [];
@@ -676,7 +730,15 @@ export class AppComponent {
             if (inFreehand) {
               const diff = left[index] - right[index];
               if (isNaN(diff)) {
-                console.log(x, y, index, left[index], right[index]);
+                console.log(
+                  x,
+                  y,
+                  index,
+                  left[index],
+                  right[index],
+                  left.length,
+                  right.length
+                );
               }
               maxDiff = Math.max(maxDiff, diff);
               minDiff = Math.min(minDiff, diff);
@@ -727,14 +789,14 @@ export class AppComponent {
       );
 
       const synchronizerFreehandRoi = new cornerstoneTools.Synchronizer(
-        'click keydown',
+        `click`,
         this.cornerstoneService.freehandRoiSynchronizer({
           onUpdateCompleted: this.drawCompCanvas,
         })
       );
 
-      for (const { getElement } of [this.imageDataLeft, this.imageDataRight]) {
-        const el = getElement();
+      for (const data of [this.imageDataLeft, this.imageDataRight]) {
+        const el = data.getElement();
         synchronizer.add(el);
         synchronizerStack.add(el);
         synchronizerFreehandRoi.add(el);
@@ -744,6 +806,11 @@ export class AppComponent {
               el,
               ToolName.FreehandRoi
             ) as any).cancelDrawing(el);
+            this.cornerstoneService.syncronize(
+              { onUpdateCompleted: (_, __) => {} },
+              el,
+              this.otherData(data).getElement()
+            );
           }
         });
       }

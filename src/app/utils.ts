@@ -1,3 +1,5 @@
+import { Offset } from './cornerstone-types';
+
 export type BBox = {
   top: number;
   bottom: number;
@@ -33,5 +35,18 @@ export const pointInBBox = (
     point.x < bbox.right &&
     point.y > bbox.top &&
     point.y < bbox.bottom
+  );
+};
+
+export const roisAreDifferent = (
+  points1: Offset[],
+  points2: Offset[]
+): boolean => {
+  return (
+    points1.length === points2.length &&
+    points2.every((p2, index) => {
+      const p1 = points1[index];
+      return p2.x === p1.x && p2.y === p1.y;
+    })
   );
 };

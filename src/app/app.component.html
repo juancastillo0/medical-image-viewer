@@ -35,9 +35,9 @@
       </select>
     </div>
     <select name="select-image" id="selectImageRight"
-      (change)="selectImageRight.value === 'NEW' ? fileInputRight.click() : changeImage(selectImageRight.value, imageDataRight)" #selectImageRight>
+      (change)="selectImageRight.value === 'IMPORT' ? fileInputRight.click() : changeImage(selectImageRight.value, imageDataRight)" #selectImageRight>
       <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}} [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
-      <option *ngIf="imageDataRight.loaded" value="NEW" [selected]="false">Import Image</option>
+      <option *ngIf="imageDataRight.loaded" value="IMPORT" [selected]="false">Import Image</option>
     </select>
     <div class="col">
       <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>

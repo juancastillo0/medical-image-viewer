@@ -9,9 +9,11 @@ import Hammer from 'hammerjs';
 import {
   CornerstoneModule,
   CornerstoneToolsModule,
+  Offset,
   RoiData,
   SynchronizerCallback,
 } from './cornerstone-types';
+import { getBoundingBox } from './utils';
 
 export const cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
 export const cornerstone: CornerstoneModule = _cornerstone;
@@ -136,20 +138,31 @@ export class CornerstoneService {
     targetViewport.translation.y = sourceViewport.translation.y / ratio;
     synchronizer.setViewport(targetElement, targetViewport);
   };
-
   freehandRoiSynchronizer = (callbacks: {
     onUpdateCompleted: (
       target: RoiData & { element: HTMLElement },
       source: RoiData & { element: HTMLElement }
     ) => void;
-  }): SynchronizerCallback => async (
+  }): SynchronizerCallback => (
     synchronizer,
     targetElement,
     sourceElement,
     eventData
   ) => {
     targetElement.focus();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    this.syncronize(callbacks, targetElement, sourceElement);
+  };
+
+  syncronize = (
+    callbacks: {
+      onUpdateCompleted: (
+        target: RoiData & { element: HTMLElement },
+        source: RoiData & { element: HTMLElement }
+      ) => void;
+    },
+    targetElement: HTMLElement,
+    sourceElement: HTMLElement
+  ) => {
     if (targetElement === sourceElement) {
       return;
     }
@@ -181,7 +194,7 @@ export class CornerstoneService {
         if (data.area > 0.1 || data.canComplete) {
           (_tool as any).updateCachedStats(image, element, data);
         } else {
-          console.log(data);
+          // console.log(data);
         }
       }
       cornerstone.updateImage(element);
@@ -214,16 +227,10 @@ export class CornerstoneService {
       cornerstone.updateImage(element);
     };
 
-    console.log(sourceRois);
-    console.log(targetRois);
-    console.log(_tool);
-
     if (!!sourceRois || !!targetRois) {
       if (!sourceRois) {
-        console.log('add to source');
         addData(sourceElement, targetRois);
       } else if (!targetRois) {
-        console.log('add to target');
         addData(targetElement, sourceRois);
       } else if (sourceRois.length !== targetRois.length) {
         // if (targetRois.length > sourceRois.length) {
@@ -293,5 +300,41 @@ export class CornerstoneService {
       cornerstone.updateImage(targetElement);
       cornerstone.updateImage(sourceElement);
     }
+  };
+
+  createRoiData = (uuid: string, points: Offset[]): RoiData => {
+    return {
+      active: false,
+      area: 10,
+      canComplete: false,
+      handles: {
+        invalidHandlePlacement: false,
+        points: points.map((p) => ({
+          active: false,
+          highlight: false,
+          lines: [],
+          ...p,
+        })),
+        textBox: {
+          active: false,
+          allowedOutsideImage: false,
+          drawnIndependently: true,
+          hasMoved: false,
+          movesIndependently: false,
+        },
+      },
+      highlight: false,
+      invalidated: false,
+      meanStdDev: {
+        count: 100,
+        mean: 300,
+        stdDev: 10,
+        variance: 20,
+      },
+      unit: '',
+      uuid,
+      visible: true,
+      polyBoundingBox: getBoundingBox(points),
+    };
   };
 }

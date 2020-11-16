@@ -17,13 +17,13 @@ export type RoiData = {
       active: boolean;
       lines: { x: number; y: number }[];
     }[];
-  };
-  textBox: {
-    active: boolean;
-    hasMoved: boolean;
-    movesIndependently: boolean;
-    drawnIndependently: boolean;
-    allowedOutsideImage: boolean;
+    textBox: {
+      active: boolean;
+      hasMoved: boolean;
+      movesIndependently: boolean;
+      drawnIndependently: boolean;
+      allowedOutsideImage: boolean;
+    };
   };
   highlight: boolean;
   invalidated: boolean;
@@ -325,6 +325,16 @@ type CornerstoneLayer = {
   image?: CornerstoneImage; // The image currently displayed in the enabledElement
   viewport?: CornerstoneViewport; // The current viewport settings of the enabledElement
   canvas?: HTMLCanvasElement; // The current canvas for this enabledElement
+  syncProps?: { originalScale?: number };
+  layerId: string;
+  renderingTools?: {
+    lastRenderedImageId: string;
+    lastRenderedIsColor: boolean;
+    lastRenderedViewport: CornerstoneViewport;
+    renderCanvas: HTMLCanvasElement;
+    renderCanvasContext: CanvasRenderingContext2D;
+    renderCanvasData: ImageData;
+  };
   options?: any; // Layer drawing options
   invalid: boolean; // Whether or not the image pixel data underlying the enabledElement has been changed, necessitating a redraw
   needsRedraw: boolean; // Boolean
