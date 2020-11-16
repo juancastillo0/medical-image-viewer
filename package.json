@@ -21,6 +21,8 @@
     "@angular/platform-browser-dynamic": "~10.1.5",
     "@angular/router": "~10.1.5",
     "@cornerstonejs/nifti-image-loader": "^1.0.4",
+    "@tensorflow/tfjs": "^2.7.0",
+    "@tensorflow/tfjs-backend-wasm": "^2.7.0",
     "@types/hammerjs": "^2.0.36",
     "cornerstone-core": "^2.3.0",
     "cornerstone-math": "^0.1.9",

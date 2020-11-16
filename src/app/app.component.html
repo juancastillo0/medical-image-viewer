@@ -34,18 +34,16 @@
         <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
       </select>
     </div>
-    <select name="select-image" id="selectImage" (change)="changeImage(selectImage.value)" #selectImage>
-      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}} [selected]="false">{{v.key}}</option>
+    <select name="select-image" id="selectImageRight"
+      (change)="selectImageRight.value === 'NEW' ? fileInputRight.click() : changeImage(selectImageRight.value, imageDataRight)" #selectImageRight>
+      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}} [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
+      <option *ngIf="imageDataRight.loaded" value="NEW" [selected]="false">Import Image</option>
     </select>
     <div class="col">
       <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
       <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
         (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
     </div>
-    <label class="button">
-      <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataRight)" #fileInput>
-      Select Files
-    </label>
   </div>
   <div class="row" style="justify-content: center;">
     <div oncontextmenu='return false;' class="disable-selection noIbar image-wrapper" unselectable='on'
@@ -54,7 +52,7 @@
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataLeft)" appDropFile
           *ngIf="imageDataLeft.loaded === false && imageDataLeft.loading === false">
           <label>
-            <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataLeft)" #fileInput>
+            <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataLeft)" #fileInputLeft>
             Select Files
           </label>
         </div>
@@ -70,10 +68,10 @@
       onselectstart='return false;' onmousedown='return false;'>
       <div id="dicomImageRight" class="image-inner" #dicomImageRight tabindex="0">
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataRight)" appDropFile
-          *ngIf="imageDataRight.loaded === false && imageDataRight.loading === false">
+          [style.display]="imageDataRight.loaded === false && imageDataRight.loading === false ? undefined: 'none'">
           <label>
             <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataRight)"
-              #fileInputComp>
+              #fileInputRight>
             Select Files
           </label>
         </div>

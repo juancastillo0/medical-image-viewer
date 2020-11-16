@@ -426,7 +426,7 @@ export type CornerstoneModule = {
   registerImageLoader: (scheme, imageLoader) => void;
   registerUnknownImageLoader: (imageLoader) => void;
   removeElementData: (element: HTMLElement, dataType) => void;
-  removeLayer: (element: HTMLElement, layerId) => void;
+  removeLayer: (element: HTMLElement, layerId: string) => void;
   renderColorImage: (enabledElement: HTMLElement, invalidated: boolean) => void;
   renderGrayscaleImage: (
     enabledElement: HTMLElement,

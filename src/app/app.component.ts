@@ -1,6 +1,7 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
 import * as dicomParser from 'dicom-parser';
-
+import * as tf from '@tensorflow/tfjs';
+import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 import embed, { VisualizationSpec } from 'vega-embed';
 import {
   CornerstoneColormap,
@@ -21,6 +22,27 @@ import {
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
 import { BBox, getBoundingBox, pointInBBox } from './utils';
+
+setWasmPaths('/assets/');
+tf.setBackend('wasm').then((loadedTFWasm) => {
+  console.log('loadedTFWasm: ', loadedTFWasm);
+});
+
+const resizeImage = (
+  imagePixels: Array<number>,
+  size: { height: number; width: number },
+  newSize: { height: number; width: number }
+): tf.Tensor3D => {
+  const imageTensor = tf.tidy(() => {
+    const tensor = tf.tensor3d(
+      imagePixels,
+      [size.height, size.width, 1],
+      'int32'
+    );
+    return tf.image.resizeBilinear(tensor, [newSize.height, newSize.width]);
+  });
+  return imageTensor;
+};
 
 type ParsingResult =
   | {
@@ -43,8 +65,10 @@ class ImageData {
   opacity = 0.7;
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
+  imageId?: string;
 
   dynamicImage?: CornerstoneImage;
+  overlayLayerId?: string;
   layerId?: string;
 
   roiPointsByStack: Array<{ [key: string]: Array<Offset> }> = [];
@@ -65,6 +89,14 @@ class ImageData {
       }
     }
     return this.roiPointsByStack[stackIndex];
+  };
+
+  clearData = () => {
+    if (this.loaded) {
+      this.roiPointsByStack = [];
+      cornerstoneTools.clearToolState(this.getElement(), ToolName.FreehandRoi);
+      cornerstone.updateImage(this.getElement(), true);
+    }
   };
 
   setPoints = (
@@ -144,6 +176,8 @@ export class AppComponent {
   imageDataRight = new ImageData(() => this._dicomImageRightElem.nativeElement);
 
   get allLoaded(): boolean {
+    (window as any).dataL = this.imageDataLeft;
+    (window as any).dataR = this.imageDataRight;
     return this.imageDataLeft.loaded && this.imageDataRight.loaded;
   }
 
@@ -171,12 +205,15 @@ export class AppComponent {
     return this._canvasCompElem?.nativeElement;
   }
 
-  changeImage = (importedImageId: string) => {};
+  changeImage = (importedImageId: string, imageData: ImageData) => {
+    const imageIds = this.importedImageIds.get(importedImageId);
+    this.loadAndViewImages(imageIds, imageData);
+  };
 
   changeColormap = (colormapId: CornerstoneColormap) => {
     this.selectedColormap = colormapId;
     if (this.allLoaded) {
-      for (const { getElement, layerId } of [
+      for (const { getElement, overlayLayerId: layerId } of [
         this.imageDataLeft,
         this.imageDataRight,
       ]) {
@@ -196,7 +233,7 @@ export class AppComponent {
     if (this.allLoaded) {
       const layer = cornerstone.getLayer(
         imageData.getElement(),
-        imageData.layerId
+        imageData.overlayLayerId
       );
 
       layer.options.opacity = imageData.opacity;
@@ -204,56 +241,14 @@ export class AppComponent {
     }
   };
 
-  drawDeltaMap = () => {
-    const layers = [
-      {
-        imageId: 'ct://1',
-      },
-      {
-        imageId: 'pet://1',
-        options: {
-          opacity: 0.7,
-          viewport: {
-            colormap: 'hotIron',
-            voi: {
-              windowWidth: 30,
-              windowCenter: 16,
-            },
-          },
-        },
-      },
-    ];
-  };
-
-  drawCompCanvas = (
-    target: RoiData & { element: HTMLElement },
-    source: RoiData & { element: HTMLElement }
-  ) => {
+  _drawRoiInCanvas = (targetPixels: Array<number>, targetBBox: BBox) => {
     const canvas = this.canvasElem;
     if (canvas === undefined) {
       return;
     }
-
     const ctx = canvas.getContext('2d');
-    console.log(target);
-    const polyBoundingBox = target.polyBoundingBox;
-    const { top, bottom, left, right, width, height } = getBoundingBox(
-      target.handles.points
-    );
-
     const CELL_SIZE = 1;
 
-    const targetPixels = cornerstone.getPixels(
-      target.element,
-      left,
-      top,
-      width,
-      height
-    );
-    console.log(targetPixels);
-    console.log(polyBoundingBox);
-    console.log(width);
-    console.log(height);
     const maxValue = targetPixels.reduce((m, c) => Math.max(m, c), 0);
     const minValue = targetPixels.reduce(
       (m, c) => Math.min(m, c),
@@ -267,9 +262,9 @@ export class AppComponent {
     ctx.beginPath();
     ctx.fillStyle = '#CCCCCC';
 
-    for (let row = 0; row < height; row++) {
-      for (let col = 0; col < width; col++) {
-        const index = row * width + col;
+    for (let row = 0; row < targetBBox.height; row++) {
+      for (let col = 0; col < targetBBox.width; col++) {
+        const index = row * targetBBox.width + col;
         // ctx.fillStyle = cells[index] == Cell.Dead ? DEAD_COLOR : ALIVE_COLOR;
         const opacity = Math.floor(
           ((maxValue - (targetPixels[index] - minValue)) * 254) /
@@ -293,9 +288,30 @@ export class AppComponent {
       }
     }
     ctx.stroke();
+  };
+
+  drawCompCanvas = (
+    target: RoiData & { element: HTMLElement },
+    source: RoiData & { element: HTMLElement }
+  ) => {
+    console.log(target);
+    const polyBoundingBox = target.polyBoundingBox;
+    const targetBBox = getBoundingBox(target.handles.points);
+    const targetPixels = cornerstone.getPixels(
+      target.element,
+      targetBBox.left,
+      targetBBox.top,
+      targetBBox.width,
+      targetBBox.height
+    );
+
+    console.log(polyBoundingBox);
+    console.log(targetBBox.width);
+    console.log(targetBBox.height);
+
+    this._drawRoiInCanvas(targetPixels, targetBBox);
 
     const sourceBBox = getBoundingBox(source.handles.points);
-
     const sourcePixels = cornerstone.getPixels(
       source.element,
       sourceBBox.left,
@@ -421,17 +437,22 @@ export class AppComponent {
       files.push(file);
     }
     if (files.length > 0) {
-      this.loadAndViewImages(files, data);
+      const imageIds: string[] = files.map((file) => {
+        if (file.type === 'application/x-gzip') {
+          const url = URL.createObjectURL(file);
+          const imageId = `nifti:${url}`;
+          return imageId;
+        }
+        return cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
+      });
+      this.loadAndViewImages(imageIds, data);
     }
   };
 
   clearTool = (): void => {
     if (this.enabledTool !== this.defaultTool) {
       for (const data of [this.imageDataLeft, this.imageDataRight]) {
-        if (this.imageDataLeft.loaded) {
-          cornerstoneTools.clearToolState(data.getElement(), this.enabledTool);
-          cornerstone.updateImage(data.getElement());
-        }
+        data.clearData();
       }
     }
   };
@@ -445,13 +466,6 @@ export class AppComponent {
           mouseButtonMask: 4,
         });
       } else {
-        console.log([
-          ...cornerstoneTools.getToolState(
-            this.imageDataLeft.getElement(),
-            toolName
-          ).data,
-        ]);
-        // this.clearTool();
         this.enabledTool = this.defaultTool;
 
         cornerstoneTools.setToolPassive(toolName, { mouseButtonMask: 1 });
@@ -465,16 +479,11 @@ export class AppComponent {
     }
   };
 
-  loadAndViewImages = async (files: File[], data: ImageData): Promise<void> => {
+  loadAndViewImages = async (
+    imageIds: Array<string>,
+    data: ImageData
+  ): Promise<void> => {
     data.loading = true;
-    const imageIds: string[] = files.map((file) => {
-      if (file.type === 'application/x-gzip') {
-        const url = URL.createObjectURL(file);
-        const imageId = `nifti:${url}`;
-        return imageId;
-      }
-      return cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
-    });
 
     const _images = (
       await Promise.all(
@@ -490,6 +499,7 @@ export class AppComponent {
 
     let stack: { currentImageIdIndex: number; imageIds: string[] };
     let firstImage: CornerstoneImage;
+
     if (!imageIds[0].startsWith('nifti:')) {
       const images = _images
         .map((im) => ({
@@ -535,13 +545,28 @@ export class AppComponent {
     }
 
     const element = data.getElement();
-    if (!data.loaded) {
-      data.loaded = true;
-      this._setUpTools(element);
+    data.loaded = true;
+    this._setUpTools(element);
+
+    if (data.layerId !== undefined) {
+      cornerstone.removeLayer(element, data.layerId);
+      cornerstone.removeLayer(element, data.overlayLayerId);
+      const previousStackState = cornerstoneTools.getToolState(
+        element,
+        'stack'
+      ) as StackToolState;
+      cornerstoneTools.removeToolState(
+        element,
+        'stack',
+        previousStackState.data[0]
+      );
+    } else {
+      cornerstoneTools.addStackStateManager(element, ['stack']);
     }
-    cornerstoneTools.addStackStateManager(element, ['stack']);
     cornerstoneTools.addToolState(element, 'stack', stack);
     this.importedImageIds.set(firstImage.imageId, stack.imageIds);
+    data.imageId = firstImage.imageId;
+    data.layerId = cornerstone.addLayer(element, firstImage, { opacity: 1 });
 
     // const viewport = cornerstone.getDefaultViewportForImage(
     //   element,
@@ -549,48 +574,48 @@ export class AppComponent {
     // );
     console.log(firstImage);
 
-    cornerstone.addLayer(element, firstImage, { opacity: 1 });
+    data.dynamicImage = {
+      imageId: data.getElement().id,
+      minPixelValue: 0,
+      maxPixelValue: 255,
+      slope: 1.0,
+      intercept: 0,
+      windowCenter: firstImage.width / 2,
+      windowWidth: firstImage.width,
+      getPixelData: this.createGetPixelData(data),
+      rows: firstImage.rows,
+      columns: firstImage.columns,
+      render: cornerstone.renderGrayscaleImage,
+      height: firstImage.height,
+      width: firstImage.width,
+      color: false,
+      columnPixelSpacing: firstImage.columnPixelSpacing,
+      rowPixelSpacing: firstImage.rowPixelSpacing,
+      invert: false,
+      sizeInBytes: firstImage.height * firstImage.width * 2,
+      data: {
+        rawPixels: new Uint16Array(firstImage.height * firstImage.width),
+      },
+    };
+    const colormap = cornerstone.colors.getColormap(this.selectedColormap);
+    colormap.setColor(0, [0, 0, 0, 0]);
 
-    if (!data.dynamicImage) {
-      data.dynamicImage = {
-        imageId: data.getElement().id,
-        minPixelValue: 0,
-        maxPixelValue: 255,
-        slope: 1.0,
-        intercept: 0,
-        windowCenter: firstImage.width / 2,
-        windowWidth: firstImage.width,
-        getPixelData: this.createGetPixelData(data),
-        rows: firstImage.rows,
-        columns: firstImage.columns,
-        render: cornerstone.renderGrayscaleImage,
-        height: firstImage.height,
-        width: firstImage.width,
-        color: false,
-        columnPixelSpacing: firstImage.columnPixelSpacing,
-        rowPixelSpacing: firstImage.rowPixelSpacing,
-        invert: false,
-        sizeInBytes: firstImage.height * firstImage.width * 2,
-        data: {
-          rawPixels: new Uint16Array(firstImage.height * firstImage.width),
-        },
-      };
-      const colormap = cornerstone.colors.getColormap(this.selectedColormap);
-      colormap.setColor(0, [0, 0, 0, 0]);
-
-      data.layerId = cornerstone.addLayer(element, data.dynamicImage, {
-        opacity: data.opacity,
-        viewport: {
-          colormap,
-          // voi: {
-          //   windowWidth: 30,
-          //   windowCenter: 16,
-          // },
-        },
-      });
+    data.overlayLayerId = cornerstone.addLayer(element, data.dynamicImage, {
+      opacity: data.opacity,
+      viewport: {
+        colormap,
+      },
+    });
+    this.toggleTool(ToolName.FreehandRoi);
+    this.toggleTool(ToolName.FreehandRoi);
+    for (const { loaded, getElement } of [
+      this.imageDataLeft,
+      this.imageDataRight,
+    ]) {
+      if (loaded) {
+        cornerstone.updateImage(getElement(), true);
+      }
     }
-
-    cornerstone.updateImage(element);
 
     element.addEventListener(
       cornerstoneTools.EVENTS.STACK_SCROLL,
@@ -627,17 +652,16 @@ export class AppComponent {
 
       const leftDataList = this.imageDataLeft.getRoiPixels();
       const rightDataList = this.imageDataRight.getRoiPixels();
-      console.log('createGetPixelData');
+      const numIterations = Math.min(leftDataList.length, rightDataList.length);
+      console.log('createGetPixelData', numIterations);
 
-      for (
-        let i = 0;
-        i < Math.min(leftDataList.length, rightDataList.length);
-        i++
-      ) {
+      for (let i = 0; i < numIterations; i++) {
         const leftData = leftDataList[i];
         const right = rightDataList[i].pixels;
         const left = leftData.pixels;
         const bbox = leftData.bbox;
+        console.log(left.length, right.length);
+        console.log(leftDataList[i].bbox, rightDataList[i].bbox);
 
         let index = 0;
         const differencePixels: [number, number][] = [];
@@ -651,6 +675,9 @@ export class AppComponent {
             );
             if (inFreehand) {
               const diff = left[index] - right[index];
+              if (isNaN(diff)) {
+                console.log(x, y, index, left[index], right[index]);
+              }
               maxDiff = Math.max(maxDiff, diff);
               minDiff = Math.min(minDiff, diff);
               differencePixels.push([
@@ -691,11 +718,11 @@ export class AppComponent {
 
     if (this.allLoaded) {
       const synchronizer: Synchronizer = new cornerstoneTools.Synchronizer(
-        'cornerstoneimagerendered',
+        cornerstone.EVENTS.IMAGE_RENDERED,
         this.cornerstoneService.panZoomSynchronizer
       );
       const synchronizerStack = new cornerstoneTools.Synchronizer(
-        'cornerstoneimagerendered',
+        cornerstone.EVENTS.IMAGE_RENDERED,
         cornerstoneTools.stackImageIndexSynchronizer
       );
 

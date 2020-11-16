@@ -200,7 +200,6 @@ export class CornerstoneService {
 
       for (const data of dataList) {
         const newData = { ...data };
-        newData.uuid = uuidv4();
         newData.handles = { ...newData.handles };
         newData.handles.points = newData.handles.points.map((p) => ({
           ...p,
@@ -281,9 +280,16 @@ export class CornerstoneService {
             console.log(dataTarget);
           }
         }
-        cornerstone.updateImage(targetElement);
-        cornerstone.updateImage(sourceElement);
       }
+      // TODO: verify for images with different sizes
+      (cornerstoneTools.getToolForElement(
+        sourceElement,
+        ToolName.FreehandRoi
+      ) as any)._configuration.mouseLocation.handles.start = {
+        ...cornerstoneTools.getToolForElement(targetElement, ToolName.FreehandRoi),
+      };
+      cornerstone.updateImage(targetElement);
+      cornerstone.updateImage(sourceElement);
     }
   };
 }
