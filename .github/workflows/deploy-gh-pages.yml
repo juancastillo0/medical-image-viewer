@@ -25,6 +25,7 @@ jobs:
       with:
         node-version: '12.x'
     - run: npm install
+    - run: node src/build.js
     - run: npm run build-gh-pages
     - uses: peaceiris/actions-gh-pages@v3
       with:
