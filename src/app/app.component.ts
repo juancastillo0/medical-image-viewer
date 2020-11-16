@@ -21,9 +21,9 @@ import {
   getToolFromName,
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
-import { BBox, getBoundingBox, pointInBBox } from './utils';
+import { BBox, getBoundingBox } from './utils';
 
-setWasmPaths('/assets/');
+setWasmPaths(`${document.location.href}assets/`);
 tf.setBackend('wasm').then((loadedTFWasm) => {
   console.log('loadedTFWasm: ', loadedTFWasm);
 });

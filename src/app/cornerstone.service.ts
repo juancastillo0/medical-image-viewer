@@ -12,7 +12,6 @@ import {
   RoiData,
   SynchronizerCallback,
 } from './cornerstone-types';
-import { v4 as uuidv4 } from 'uuid';
 
 export const cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
 export const cornerstone: CornerstoneModule = _cornerstone;
@@ -93,10 +92,10 @@ export class CornerstoneService {
     );
 
     const config = {
-      webWorkerPath: '/assets/cornerstoneWADOImageLoaderWebWorker.min.js',
+      webWorkerPath: `${document.location.href}assets/cornerstoneWADOImageLoaderWebWorker.min.js`,
       taskConfiguration: {
         decodeTask: {
-          codecsPath: '/assets/cornerstoneWADOImageLoaderCodecs.js',
+          codecsPath: `${document.location.href}assets/cornerstoneWADOImageLoaderCodecs.js`,
         },
       },
     };
@@ -286,7 +285,10 @@ export class CornerstoneService {
         sourceElement,
         ToolName.FreehandRoi
       ) as any)._configuration.mouseLocation.handles.start = {
-        ...cornerstoneTools.getToolForElement(targetElement, ToolName.FreehandRoi),
+        ...cornerstoneTools.getToolForElement(
+          targetElement,
+          ToolName.FreehandRoi
+        ),
       };
       cornerstone.updateImage(targetElement);
       cornerstone.updateImage(sourceElement);
