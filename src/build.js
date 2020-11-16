@@ -111,7 +111,7 @@ fs.writeFileSync(
   "utf-8"
 );
 
-const cornerstoneWADOImageLoaderPackageJson = `
+const cornerstoneWADOImageLoaderPackageJson = String.raw`
 {
   "name": "cornerstone-wado-image-loader",
   "version": "2.2.4",
@@ -201,7 +201,6 @@ const cornerstoneWADOImageLoaderPackageJson = `
     "dicom-parser": "^1.8.1"
   }
 }
-
 `;
 
 const wadoPath = "node_modules/cornerstone-wado-image-loader/package.json";
