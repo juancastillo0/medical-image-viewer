@@ -92,10 +92,10 @@ export class CornerstoneService {
     );
 
     const config = {
-      webWorkerPath: `${document.location.href}assets/cornerstoneWADOImageLoaderWebWorker.min.js`,
+      webWorkerPath: `./assets/cornerstoneWADOImageLoaderWebWorker.min.js`,
       taskConfiguration: {
         decodeTask: {
-          codecsPath: `${document.location.href}assets/cornerstoneWADOImageLoaderCodecs.js`,
+          codecsPath: `./assets/cornerstoneWADOImageLoaderCodecs.js`,
         },
       },
     };

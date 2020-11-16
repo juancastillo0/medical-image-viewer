@@ -23,7 +23,7 @@ import {
 import { ImageMetadataService } from './image-metadata.service';
 import { BBox, getBoundingBox } from './utils';
 
-setWasmPaths(`${document.location.href}assets/`);
+setWasmPaths(`./assets/`);
 tf.setBackend('wasm').then((loadedTFWasm) => {
   console.log('loadedTFWasm: ', loadedTFWasm);
 });
