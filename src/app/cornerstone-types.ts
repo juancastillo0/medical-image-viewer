@@ -3,28 +3,30 @@ import {
   CORNERSTONE_TOOLS_EVENTS,
 } from './cornerstone-events';
 
+export type RoiDataHandles = {
+  invalidHandlePlacement: boolean;
+  points: {
+    x: number;
+    y: number;
+    highlight: boolean;
+    active: boolean;
+    lines: { x: number; y: number }[];
+  }[];
+  textBox: {
+    active: boolean;
+    hasMoved: boolean;
+    movesIndependently: boolean;
+    drawnIndependently: boolean;
+    allowedOutsideImage: boolean;
+  };
+};
+
 export type RoiData = {
   active: boolean;
   area: number;
   canComplete: boolean;
   color?: any;
-  handles: {
-    invalidHandlePlacement: boolean;
-    points: {
-      x: number;
-      y: number;
-      highlight: boolean;
-      active: boolean;
-      lines: { x: number; y: number }[];
-    }[];
-    textBox: {
-      active: boolean;
-      hasMoved: boolean;
-      movesIndependently: boolean;
-      drawnIndependently: boolean;
-      allowedOutsideImage: boolean;
-    };
-  };
+  handles: RoiDataHandles;
   highlight: boolean;
   invalidated: boolean;
   meanStdDev: {

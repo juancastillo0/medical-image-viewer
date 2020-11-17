@@ -147,9 +147,51 @@
       </div>
     </div>
     <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;overflow: auto;">
-      <div class="row" style="justify-content: space-around;align-items: center;height: 100%;">
-        <canvas id="canvasComp" #canvasComp></canvas>
-        <div class="col">
+      <div class="row" style="justify-content: space-between;align-items: center;height: 100%;">
+        <!-- <canvas id="canvasComp" #canvasComp></canvas> -->
+        <div *ngIf="volumeStats === undefined" style="flex: 1;text-align: center;">
+          No Comparison Available. Select a region of interest for the comparison.
+        </div>
+        <div *ngIf="volumeStats !== undefined" style="padding-left: 5px;">
+          <table>
+            <h4>Left</h4>
+            <tr>
+              <td>Mean</td>
+              <td>{{volumeStats.meanLeft}}</td>
+            </tr>
+            <tr>
+              <td>Std.</td>
+              <td>{{volumeStats.stdLeft}}</td>
+            </tr>
+            <h4>Right</h4>
+            <tr>
+              <td>Mean</td>
+              <td>{{volumeStats.meanRight}}</td>
+            </tr>
+            <tr>
+              <td>Std.</td>
+              <td>{{volumeStats.stdRight}}</td>
+            </tr>
+            <h4>Difference</h4>
+            <tr>
+              <td>Mean</td>
+              <td>{{volumeStats.mean}}</td>
+            </tr>
+            <tr>
+              <td>Std.</td>
+              <td>{{volumeStats.std}}</td>
+            </tr>
+            <tr>
+              <td>Max</td>
+              <td>{{volumeStats.max}}</td>
+            </tr>
+            <tr>
+              <td>Min</td>
+              <td>{{volumeStats.min}}</td>
+            </tr>
+          </table>
+        </div>
+        <div class="col" [style.display]="volumeStats !== undefined ? undefined: 'none'">
           <h4>Distribution</h4>
           <div id="distChart" style="flex: 1;"
             [style.display]="selectedHistogram === HistogramType.dist ? undefined: 'none'">
@@ -157,16 +199,6 @@
           <div id="diffChart" style="flex: 1;"
             [style.display]="selectedHistogram === HistogramType.diff ? undefined: 'none'">
           </div>
-          <!-- <table>
-            <tr>
-              <td>Mean</td>
-              <td>2</td>
-            </tr>
-            <tr>
-              <td>Std.</td>
-              <td>5</td>
-            </tr>
-          </table> -->
         </div>
       </div>
     </div>

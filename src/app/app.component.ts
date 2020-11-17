@@ -55,6 +55,26 @@ type ParsingResult =
       parsingError: string;
     };
 
+type DiffData = {
+  array: Array<[number, number]>;
+  max: number;
+  min: number;
+  sum: number;
+};
+
+type ImageStackData = {
+  [key: string]: {
+    points: Array<Offset>;
+    diffData?: DiffData;
+    stats: {
+      count: number;
+      mean: number;
+      variance: number;
+      stdDev: number;
+    };
+  };
+};
+
 class ImageData {
   constructor(getElement: () => HTMLDivElement) {
     this.getElement = getElement;
@@ -71,7 +91,7 @@ class ImageData {
   overlayLayerId?: string;
   layerId?: string;
 
-  roiPointsByStack: Array<{ [key: string]: Array<Offset> }> = [];
+  roiPointsByStack: ImageStackData[] = [];
 
   currentStackIndex = (): number => {
     const stackState = cornerstoneTools.getToolState(
@@ -81,9 +101,7 @@ class ImageData {
     return stackState.data[0].currentImageIdIndex;
   };
 
-  currentStackPoints = (
-    stackIndex?: number
-  ): { [key: string]: Array<Offset> } | undefined => {
+  currentStackPoints = (stackIndex?: number): ImageStackData | undefined => {
     if (stackIndex === undefined) {
       try {
         stackIndex = this.currentStackIndex();
@@ -105,17 +123,24 @@ class ImageData {
   setPoints = (
     stackIndex: number,
     uuid: string,
-    points: Array<Offset>
+    points: Array<Offset>,
+    stats: {
+      count: number;
+      mean: number;
+      variance: number;
+      stdDev: number;
+    }
   ): void => {
     let map = this.roiPointsByStack[stackIndex];
     if (!map) {
       map = {};
       this.roiPointsByStack[stackIndex] = map;
     }
-    map[uuid] = points.map((p) => ({ ...p }));
+    map[uuid] = { points: points.map((p) => ({ ...p })), stats };
   };
 
   getRoiPixels = (): Array<{
+    uuid: string;
     pixels: number[];
     bbox: BBox;
     points: Array<Offset>;
@@ -126,7 +151,7 @@ class ImageData {
       return [];
     }
 
-    return Object.values(pointsMap).map((points) => {
+    return Object.entries(pointsMap).map(([uuid, { points }]) => {
       const sourceBBox = getBoundingBox(points);
       return {
         pixels: cornerstone.getPixels(
@@ -138,6 +163,7 @@ class ImageData {
         ),
         bbox: sourceBBox,
         points,
+        uuid,
       };
     });
   };
@@ -176,6 +202,18 @@ export class AppComponent {
   selectedColormap = CornerstoneColormap.hotIron;
 
   importedImageIds: Map<string, Array<string>> = new Map();
+  volumeStats?: {
+    count: number;
+    sum: number;
+    min: number;
+    max: number;
+    mean: number;
+    std: number;
+    meanLeft: number;
+    meanRight: number;
+    stdLeft: number;
+    stdRight: number;
+  };
 
   imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement);
   imageDataRight = new ImageData(() => this._dicomImageRightElem.nativeElement);
@@ -323,7 +361,7 @@ export class AppComponent {
       !!stackPoints &&
       !!stackPoints[leftRoiData.uuid] &&
       roisAreDifferent(
-        stackPoints[leftRoiData.uuid],
+        stackPoints[leftRoiData.uuid].points,
         leftRoiData.handles.points
       )
     ) {
@@ -333,7 +371,7 @@ export class AppComponent {
 
     const leftBBox = getBoundingBox(leftRoiData.handles.points);
     const leftPixels = cornerstone.getPixels(
-      target.element,
+      leftRoiData.element,
       leftBBox.left,
       leftBBox.top,
       leftBBox.width,
@@ -344,7 +382,7 @@ export class AppComponent {
 
     const rightBBox = getBoundingBox(rightRoiData.handles.points);
     const rightPixels = cornerstone.getPixels(
-      source.element,
+      rightRoiData.element,
       rightBBox.left,
       rightBBox.top,
       rightBBox.width,
@@ -354,12 +392,14 @@ export class AppComponent {
     this.imageDataRight.setPoints(
       stackIndex,
       rightRoiData.uuid,
-      rightRoiData.handles.points
+      rightRoiData.handles.points,
+      rightRoiData.meanStdDev
     );
     this.imageDataLeft.setPoints(
       stackIndex,
       leftRoiData.uuid,
-      leftRoiData.handles.points
+      leftRoiData.handles.points,
+      leftRoiData.meanStdDev
     );
     this.drawHistogram(leftPixels, rightPixels);
     cornerstone.updateImage(this.imageDataLeft.getElement(), true);
@@ -668,12 +708,15 @@ export class AppComponent {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         for (const d of [this.imageDataLeft, this.imageDataRight]) {
-          // if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
-          //   return;
-          // }
+          if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
+            return;
+          }
           const stackPointCurr = d.currentStackPoints(eDetail.newImageIdIndex);
           const elem = d.getElement();
-          const shouldUpdate = this.synchronizeRoiPoints(elem, stackPointCurr ?? {});
+          const shouldUpdate = this.synchronizeRoiPoints(
+            elem,
+            stackPointCurr ?? {}
+          );
           if (
             shouldUpdate ||
             !!stackPointCurr ||
@@ -700,7 +743,7 @@ export class AppComponent {
 
   synchronizeRoiPoints = (
     elem: HTMLElement,
-    stackPointCurr: { [key: string]: Offset[] }
+    stackPointCurr: ImageStackData
   ): boolean => {
     const state = cornerstoneTools.getToolState(elem, ToolName.FreehandRoi) ?? {
       data: [],
@@ -716,7 +759,7 @@ export class AppComponent {
     }, new Map<string, RoiData>());
 
     let result = false;
-    Object.entries(stackPointCurr).map(([key, value]) => {
+    Object.entries(stackPointCurr).map(([key, { points: value }]) => {
       if (!map.has(key)) {
         result = true;
         cornerstoneTools.addToolState(
@@ -734,6 +777,9 @@ export class AppComponent {
         // }
       }
     });
+    if (result) {
+      this.imageDataLeft.getElement().click();
+    }
     return result;
   };
 
@@ -790,6 +836,16 @@ export class AppComponent {
             index++;
           }
         }
+        const _diffData = {
+          array: differencePixels,
+          max: maxDiff,
+          min: minDiff,
+          sum: sumDiff,
+        };
+        this.imageDataLeft.currentStackPoints()[
+          leftData.uuid
+        ].diffData = _diffData;
+
         for (const [ind, diff] of differencePixels) {
           const value = Math.floor(
             ((diff - minDiff) / (maxDiff - minDiff)) * 255
@@ -797,9 +853,85 @@ export class AppComponent {
           rawPixels[ind] = value;
         }
       }
+      this.updateVolumeStats();
 
       return rawPixels as any;
     };
+  };
+
+  updateVolumeStats = () => {
+    const difList = this.imageDataLeft.roiPointsByStack
+      .flatMap((v) => Object.values(v))
+      .filter((v) => v.diffData !== undefined);
+
+    const stats = difList.reduce(
+      (previous, { diffData, stats }) => {
+        previous.count += diffData.array.length;
+        previous.sum += diffData.sum;
+        previous.min = Math.min(previous.min, diffData.min);
+        previous.max = Math.max(previous.max, diffData.max);
+
+        previous.leftSum += stats.mean * stats.count;
+        previous.leftCount += stats.count;
+        previous.leftVarianceSum += stats.variance * stats.count;
+        return previous;
+      },
+      {
+        count: 0,
+        sum: 0,
+        varianceSum: 0,
+        min: Number.MAX_VALUE,
+        max: Number.MIN_VALUE,
+        leftCount: 0,
+        leftSum: 0,
+        leftVarianceSum: 0,
+      }
+    );
+    const diffMean = stats.sum / stats.count;
+
+    const diffVariance =
+      difList
+        .flatMap(({ diffData }) => diffData.array)
+        .reduce((previous, [_, value]) => {
+          return previous + Math.pow(value - diffMean, 2);
+        }, 0) / stats.count;
+
+    const statsRight = this.imageDataRight.roiPointsByStack
+      .flatMap((v) => Object.values(v))
+      .filter((v) => v.stats !== undefined)
+      .reduce(
+        (previous, { stats }) => {
+          previous.rightSum += stats.mean * stats.count;
+          previous.rightCount += stats.count;
+          previous.varianceSum += stats.variance * stats.count;
+          return previous;
+        },
+        {
+          rightCount: 0,
+          rightSum: 0,
+          varianceSum: 0,
+        }
+      );
+
+    if (stats.count > 0) {
+      this.volumeStats = {
+        ...stats,
+        mean: Number.parseFloat(diffMean.toFixed(2)),
+        std: Number.parseFloat(Math.sqrt(diffVariance).toFixed(2)),
+        meanLeft: Number.parseFloat(
+          (stats.leftSum / stats.leftCount).toFixed(2)
+        ),
+        stdLeft: Number.parseFloat(
+          Math.sqrt(stats.leftVarianceSum / stats.leftCount).toFixed(2)
+        ),
+        meanRight: Number.parseFloat(
+          (statsRight.rightSum / statsRight.rightCount).toFixed(2)
+        ),
+        stdRight: Number.parseFloat(
+          Math.sqrt(statsRight.varianceSum / statsRight.rightCount).toFixed(2)
+        ),
+      };
+    }
   };
 
   _setUpTools = (element: HTMLDivElement): void => {
