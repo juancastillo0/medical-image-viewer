@@ -12,10 +12,12 @@
 
 <div class="col">
   <div class="row" id="top-menu">
-    <label class="button">
-      <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataLeft)" #fileInput>
-      Select Files
-    </label>
+    <select *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" name="select-image" id="selectImageLeft"
+      (input)="changeImage(selectImageLeft, imageDataLeft)" #selectImageLeft>
+      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+        [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
+      <option value="IMPORT" [selected]="false">Import Image</option>
+    </select>
     <div class="col">
       <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
       <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
@@ -34,10 +36,11 @@
         <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
       </select>
     </div>
-    <select name="select-image" id="selectImageRight"
-      (change)="selectImageRight.value === 'IMPORT' ? fileInputRight.click() : changeImage(selectImageRight.value, imageDataRight)" #selectImageRight>
-      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}} [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
-      <option *ngIf="imageDataRight.loaded" value="IMPORT" [selected]="false">Import Image</option>
+    <select *ngIf="imageDataRight.loaded || importedImageIds.size > 1" name="select-image" id="selectImageRight"
+      (input)="changeImage(selectImageRight, imageDataRight)" #selectImageRight>
+      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+        [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
+      <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
     </select>
     <div class="col">
       <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
@@ -50,9 +53,10 @@
       onselectstart='return false;' onmousedown='return false;'>
       <div id="dicomImageLeft" class="image-inner" #dicomImageLeft tabindex="0">
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataLeft)" appDropFile
-          *ngIf="imageDataLeft.loaded === false && imageDataLeft.loading === false">
+          [style.display]="imageDataLeft.loaded === false && imageDataLeft.loading === false ? undefined: 'none'">
           <label>
-            <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataLeft)" #fileInputLeft>
+            <input hidden id="fileInputLeft" type="file" multiple
+              (change)="uploadFile($event.target.files, imageDataLeft)" #fileInputLeft>
             Select Files
           </label>
         </div>
@@ -70,8 +74,8 @@
         <div class="dropZone" (onFileDropped)="uploadFile($event, imageDataRight)" appDropFile
           [style.display]="imageDataRight.loaded === false && imageDataRight.loading === false ? undefined: 'none'">
           <label>
-            <input hidden type="file" multiple (change)="uploadFile($event.target.files, imageDataRight)"
-              #fileInputRight>
+            <input hidden id="fileInputRight" type="file" multiple
+              (change)="uploadFile($event.target.files, imageDataRight)" #fileInputRight>
             Select Files
           </label>
         </div>

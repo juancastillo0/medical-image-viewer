@@ -167,7 +167,9 @@ export class AppComponent {
   constructor(
     private cornerstoneService: CornerstoneService,
     private metadataService: ImageMetadataService
-  ) {}
+  ) {
+    (window as any).app = this;
+  }
 
   readonly defaultTool = ToolName.Pan;
   enabledTool = ToolName.Pan;
@@ -208,9 +210,17 @@ export class AppComponent {
     return this._canvasCompElem?.nativeElement;
   }
 
-  changeImage = (importedImageId: string, imageData: ImageData) => {
-    const imageIds = this.importedImageIds.get(importedImageId);
-    this.loadAndViewImages(imageIds, imageData);
+  changeImage = (selectElem: HTMLSelectElement, imageData: ImageData) => {
+    if (selectElem.value === 'IMPORT') {
+      selectElem.value = imageData.imageId;
+      const _elemId = `fileInput${
+        imageData === this.imageDataLeft ? 'Left' : 'Right'
+      }`;
+      document.getElementById(_elemId).click();
+    } else if (selectElem.value !== imageData.imageId) {
+      const imageIds = this.importedImageIds.get(selectElem.value);
+      this.loadAndViewImages(imageIds, imageData);
+    }
   };
 
   changeColormap = (colormapId: CornerstoneColormap) => {
@@ -370,6 +380,7 @@ export class AppComponent {
 
     const specDist: VisualizationSpec = {
       width: 600,
+      height: 180,
       data: {
         values: data,
       },
@@ -391,17 +402,28 @@ export class AppComponent {
         },
       ],
       encoding: {
-        x: { bin: { binned: true }, field: 'Binned', type: 'quantitative' },
+        x: {
+          bin: { binned: true },
+          field: 'Binned',
+          type: 'quantitative',
+          axis: {
+            title: 'Intensity',
+          },
+        },
         x2: {
           field: 'Binned_end',
         },
         y: {
           field: 'RelativeCount',
           type: 'quantitative',
+          axis: {
+            title: 'Percentage',
+          },
         },
         color: {
           field: 'type',
           scale: { range: ['#675193', '#ca8861'] },
+          legend: { orient: 'bottom' },
         },
         opacity: { value: 0.6 },
       },
@@ -411,6 +433,7 @@ export class AppComponent {
 
     const specDiff: VisualizationSpec = {
       width: 600,
+      height: 180,
       data: {
         values: leftPixels.map((p, index) => ({
           delta: p - rightPixels[index],
@@ -418,10 +441,19 @@ export class AppComponent {
       },
       mark: 'bar',
       encoding: {
-        x: { field: 'delta', bin: true },
+        x: {
+          field: 'delta',
+          bin: true,
+          axis: {
+            title: 'Intensity Difference (Left - Right)',
+          },
+        },
         y: {
           aggregate: 'count',
           stack: null,
+          axis: {
+            title: 'Pixel Count',
+          },
         },
       },
     };
@@ -487,7 +519,12 @@ export class AppComponent {
     imageIds: Array<string>,
     data: ImageData
   ): Promise<void> => {
-    data.loading = true;
+    // if (data.loaded){
+    //   data.getElement().hidden = false;
+    // }
+    if (!data.loaded) {
+      data.loading = true;
+    }
 
     const _images = (
       await Promise.all(
@@ -631,17 +668,17 @@ export class AppComponent {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         for (const d of [this.imageDataLeft, this.imageDataRight]) {
-          if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
-            return;
-          }
+          // if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
+          //   return;
+          // }
           const stackPointCurr = d.currentStackPoints(eDetail.newImageIdIndex);
+          const elem = d.getElement();
+          const shouldUpdate = this.synchronizeRoiPoints(elem, stackPointCurr ?? {});
           if (
+            shouldUpdate ||
             !!stackPointCurr ||
             !!d.currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
           ) {
-            const elem = d.getElement();
-            this.synchronizeRoiPoints(elem, stackPointCurr ?? {});
-
             cornerstone.updateImage(elem, true);
           }
         }
@@ -689,6 +726,7 @@ export class AppComponent {
         );
       } else {
         map.get(key).handles.points.forEach((p, index) => {
+          result = result || p.x !== value[index].x || p.y !== value[index].y;
           p.x = value[index].x;
           p.y = value[index].y;
         });
@@ -721,6 +759,7 @@ export class AppComponent {
         const differencePixels: [number, number][] = [];
         let maxDiff = Number.MIN_VALUE;
         let minDiff = Number.MAX_VALUE;
+        let sumDiff = 0;
         for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
           for (let x = bbox.left; x < bbox.left + bbox.width; x++) {
             const inFreehand = this.cornerstoneService.pointInFreehand(
@@ -742,6 +781,7 @@ export class AppComponent {
               }
               maxDiff = Math.max(maxDiff, diff);
               minDiff = Math.min(minDiff, diff);
+              sumDiff += diff;
               differencePixels.push([
                 Math.round(y) * data.dynamicImage.width + Math.round(x),
                 diff,
@@ -757,19 +797,6 @@ export class AppComponent {
           rawPixels[ind] = value;
         }
       }
-
-      // for (const [ind, diff] of differencePixels) {
-      //   const value = Math.floor(
-      //     ((diff - minDiff) / (maxDiff - minDiff)) * 255
-      //   );
-
-      //   const rescaled = value * 3;
-      //   rawPixels[ind * 4] = rescaled < 255 ? rescaled : 255;
-      //   rawPixels[ind * 4 + 1] =
-      //     rescaled > 255 ? (rescaled > 255 * 2 ? 255 : rescaled - 255) : 0;
-      //   rawPixels[ind * 4 + 2] = rescaled > 255 * 2 ? rescaled - 255 * 2 : 0;
-      //   rawPixels[ind * 4 + 3] = 255;
-      // }
 
       return rawPixels as any;
     };
