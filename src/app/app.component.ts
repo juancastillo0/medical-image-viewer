@@ -200,7 +200,8 @@ export class AppComponent {
   readonly defaultTool = ToolName.Pan;
   enabledTool = ToolName.Pan;
   selectedColormap = CornerstoneColormap.hotIron;
-
+  stackSize: number;
+  stackPosition: number;
   importedImageIds: Map<string, Array<string>> = new Map();
   volumeStats?: {
     count: number;
@@ -640,6 +641,8 @@ export class AppComponent {
       stack.currentImageIdIndex = this.otherData(data).currentStackIndex();
     }
     cornerstoneTools.addToolState(element, 'stack', stack);
+    this.stackPosition = stack.currentImageIdIndex;
+    this.stackSize = stack.imageIds.length;
     data.imageId = firstImage.imageId;
     this.importedImageIds.set(firstImage.imageId, stack.imageIds);
     data.layerId = cornerstone.addLayer(element, firstImage, { opacity: 1 });
@@ -705,6 +708,7 @@ export class AppComponent {
           newImageIdIndex: number;
           direction: 1 | -1;
         };
+        this.stackPosition = eDetail.newImageIdIndex;
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         for (const d of [this.imageDataLeft, this.imageDataRight]) {

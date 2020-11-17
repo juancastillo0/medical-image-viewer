@@ -30,6 +30,9 @@
         [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">ROI Tool</button>
     </div>
     <button (click)="clearTool()">Clear</button>
+    <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
+      {{stackPosition + 1}}/{{stackSize}}
+    </div>
     <div class="col">
       <label for="selectColormap" class="small-label">Colormap</label>
       <select name="colormap" id="selectColormap" (change)="changeColormap(selectColormap.value)" #selectColormap>
