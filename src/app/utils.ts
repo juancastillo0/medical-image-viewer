@@ -38,10 +38,13 @@ export const pointInBBox = (
   );
 };
 
-export const roisAreDifferent = (
+export const roisAreEqual = (
   points1: Offset[],
   points2: Offset[]
 ): boolean => {
+  if (points1 === undefined || points2 === undefined) {
+    return false;
+  }
   return (
     points1.length === points2.length &&
     points2.every((p2, index) => {

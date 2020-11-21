@@ -93,7 +93,7 @@
   </div>
   <div style="flex:1;" class="col">
     <div class="row" style="justify-content: space-between;">
-      <div class="row" style="justify-content: space-between;flex: 1;"
+      <div class="row" style="justify-content: space-between;flex: 2;"
         [ngClass]="{'hidden': currentInfoView !== InfoView.Metadata}">
         <div class="row" style="align-items: center;">
           <h2 style="padding: 0 25px 5px 5px;">Metadata</h2>
@@ -108,7 +108,7 @@
             (keyup)="onSearchInput(inputSearchMetadata.value)">
         </div>
       </div>
-      <div class="row" style="justify-content: space-between;flex: 1;"
+      <div class="row" style="justify-content: space-between;flex: 2;"
         [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}">
         <div class="row" style="align-items: center;">
           <h2 style="padding: 0 25px 5px 5px;">Comparison</h2>
@@ -118,6 +118,17 @@
           <button (click)="selectHistogram(HistogramType.diff)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
             [ngClass]="{'pressed': selectedHistogram === HistogramType.diff}">Difference</button>
+        </div>
+        <div class="row" style="align-items: center;">
+          <button (click)="selectHistogramRegion(HistogramRegion.volume)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.volume}">Volume</button>
+          <button (click)="selectHistogramRegion(HistogramRegion.stackPosition)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.stackPosition}">Stack Position</button>
+          <button (click)="selectHistogramRegion(HistogramRegion.lastRoi)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.lastRoi}">Last ROI</button>
         </div>
       </div>
       <div class="row" style="justify-content: flex-end;align-items: center;flex: 1;">
