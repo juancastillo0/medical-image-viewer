@@ -67,15 +67,14 @@ type DiffData = {
 };
 
 type ImageStackData = {
-  [key: string]: {
-    points: Array<Offset>;
-    diffData?: DiffData;
-    stats: {
-      count: number;
-      mean: number;
-      variance: number;
-      stdDev: number;
-    };
+  uuid: string;
+  points: Array<Offset>;
+  diffData?: DiffData;
+  stats: {
+    count: number;
+    mean: number;
+    variance: number;
+    stdDev: number;
   };
 };
 
@@ -90,12 +89,13 @@ class ImageData {
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
   imageId?: string;
+  lastRoiUuid?: string;
 
   dynamicImage?: CornerstoneImage;
   overlayLayerId?: string;
   layerId?: string;
 
-  roiPointsByStack: ImageStackData[] = [];
+  roiPointsByStack: { [key: string]: ImageStackData }[] = [];
 
   currentStackIndex = (): number => {
     const stackState = cornerstoneTools.getToolState(
@@ -105,7 +105,9 @@ class ImageData {
     return stackState.data[0].currentImageIdIndex;
   };
 
-  currentStackPoints = (stackIndex?: number): ImageStackData | undefined => {
+  currentStackPoints = (
+    stackIndex?: number
+  ): { [key: string]: ImageStackData } | undefined => {
     if (stackIndex === undefined) {
       try {
         stackIndex = this.currentStackIndex();
@@ -140,7 +142,7 @@ class ImageData {
       map = {};
       this.roiPointsByStack[stackIndex] = map;
     }
-    map[uuid] = { points: points.map((p) => ({ ...p })), stats };
+    map[uuid] = { uuid, points: points.map((p) => ({ ...p })), stats };
   };
 
   getRoiPixels = (): Array<{
@@ -377,8 +379,10 @@ export class AppComponent {
         leftRoiData.handles.points
       )
     ) {
-      console.log('dwddwdwaodwaniw');
       return;
+    } else {
+      this.imageDataLeft.lastRoiUuid = leftRoiData.uuid;
+      this.imageDataRight.lastRoiUuid = rightRoiData.uuid;
     }
 
     const leftBBox = getBoundingBox(leftRoiData.handles.points);
@@ -413,19 +417,19 @@ export class AppComponent {
       leftRoiData.handles.points,
       leftRoiData.meanStdDev
     );
-    this.drawHistogram(leftPixels, rightPixels);
+
     cornerstone.updateImage(this.imageDataLeft.getElement(), true);
     cornerstone.updateImage(this.imageDataRight.getElement(), true);
   };
 
-  drawHistogram = (leftPixels: number[], rightPixels: number[]): void => {
+  drawHistogram = (points: DiffPoint[]): void => {
     const data = [
-      ...leftPixels.map((p) => ({
-        intensity: p,
+      ...points.map((p) => ({
+        intensity: p.left,
         type: 'Left',
       })),
-      ...rightPixels.map((p) => ({
-        intensity: p,
+      ...points.map((p) => ({
+        intensity: p.right,
         type: 'Right',
       })),
     ];
@@ -487,8 +491,8 @@ export class AppComponent {
       width: 600,
       height: 180,
       data: {
-        values: leftPixels.map((p, index) => ({
-          delta: p - rightPixels[index],
+        values: points.map((p) => ({
+          delta: p.diff,
         })),
       },
       mark: 'bar',
@@ -762,7 +766,7 @@ export class AppComponent {
 
   synchronizeRoiPoints = (
     elem: HTMLElement,
-    stackPointCurr: ImageStackData
+    stackPointCurr: { [key: string]: ImageStackData }
   ): boolean => {
     const state = cornerstoneTools.getToolState(elem, ToolName.FreehandRoi) ?? {
       data: [],
@@ -804,8 +808,6 @@ export class AppComponent {
 
   createGetPixelData = (data: ImageData): (() => number[]) => {
     return () => {
-      const image = data.dynamicImage;
-
       const _curr = this.imageDataLeft.currentStackPoints();
       const leftDataList = this.imageDataLeft.getRoiPixels();
       const rightDataList = this.imageDataRight.getRoiPixels();
@@ -890,16 +892,34 @@ export class AppComponent {
           rawPixels[p.index] = value;
         }
       }
-      this.updateVolumeStats();
+      setTimeout(this.updateVolumeStats, 10);
 
       return rawPixels as any;
     };
   };
 
   updateVolumeStats = () => {
+    let filter: (d: ImageStackData) => boolean;
+    switch (this.selectedHistogramRegion) {
+      case HistogramRegion.lastRoi:
+        filter = (d) => d.uuid === this.imageDataLeft.lastRoiUuid;
+        break;
+      case HistogramRegion.stackPosition:
+        const curr = this.imageDataLeft.currentStackPoints();
+        filter = (d) => curr !== undefined && curr[d.uuid] !== undefined;
+        break;
+      case HistogramRegion.volume:
+        filter = (_) => true;
+        break;
+    }
+
     const difList = this.imageDataLeft.roiPointsByStack
       .flatMap((v) => Object.values(v))
-      .filter((v) => v.diffData !== undefined);
+      .filter((v) => v.diffData !== undefined && filter(v));
+    if (difList.length === 0){
+      return;
+    }
+    this.drawHistogram(difList.flatMap((d) => d.diffData.array));
 
     const stats = difList.reduce(
       (previous, { diffData, stats }) => {
@@ -935,7 +955,7 @@ export class AppComponent {
 
     const statsRight = this.imageDataRight.roiPointsByStack
       .flatMap((v) => Object.values(v))
-      .filter((v) => v.stats !== undefined)
+      .filter((v) => v.stats !== undefined && filter(v))
       .reduce(
         (previous, { stats }) => {
           previous.rightSum += stats.mean * stats.count;
@@ -950,22 +970,18 @@ export class AppComponent {
         }
       );
 
+    const toFloatStr = (v: number) => Number.parseFloat(v.toFixed(1));
+
     if (stats.count > 0) {
       this.volumeStats = {
         ...stats,
-        mean: Number.parseFloat(diffMean.toFixed(2)),
-        std: Number.parseFloat(Math.sqrt(diffVariance).toFixed(2)),
-        meanLeft: Number.parseFloat(
-          (stats.leftSum / stats.leftCount).toFixed(2)
-        ),
-        stdLeft: Number.parseFloat(
-          Math.sqrt(stats.leftVarianceSum / stats.leftCount).toFixed(2)
-        ),
-        meanRight: Number.parseFloat(
-          (statsRight.rightSum / statsRight.rightCount).toFixed(2)
-        ),
-        stdRight: Number.parseFloat(
-          Math.sqrt(statsRight.varianceSum / statsRight.rightCount).toFixed(2)
+        mean: toFloatStr(diffMean),
+        std: toFloatStr(Math.sqrt(diffVariance)),
+        meanLeft: toFloatStr(stats.leftSum / stats.leftCount),
+        stdLeft: toFloatStr(Math.sqrt(stats.leftVarianceSum / stats.leftCount)),
+        meanRight: toFloatStr(statsRight.rightSum / statsRight.rightCount),
+        stdRight: toFloatStr(
+          Math.sqrt(statsRight.varianceSum / statsRight.rightCount)
         ),
       };
     }
@@ -1081,6 +1097,7 @@ export class AppComponent {
   };
   selectHistogramRegion = (histRegion: HistogramRegion) => {
     this.selectedHistogramRegion = histRegion;
+    this.updateVolumeStats();
   };
 
   onSearchInput = (inputStr: string) => {
