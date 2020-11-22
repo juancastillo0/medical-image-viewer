@@ -118,14 +118,6 @@ class ImageData {
     return this.roiPointsByStack[stackIndex];
   };
 
-  clearData = () => {
-    if (this.loaded) {
-      this.roiPointsByStack = [];
-      cornerstoneTools.clearToolState(this.getElement(), ToolName.FreehandRoi);
-      cornerstone.updateImage(this.getElement(), true);
-    }
-  };
-
   setPoints = (
     stackIndex: number,
     uuid: string,
@@ -173,6 +165,61 @@ class ImageData {
       };
     });
   };
+
+  getData = (histogramRegion: HistogramRegion) => {
+    let filter: (d: ImageStackData) => boolean;
+    switch (histogramRegion) {
+      case HistogramRegion.lastRoi:
+        filter = (d) => d.uuid === this.lastRoiUuid;
+        break;
+      case HistogramRegion.stackPosition:
+        const curr = this.currentStackPoints();
+        filter = (d) => curr !== undefined && curr[d.uuid] !== undefined;
+        break;
+      case HistogramRegion.volume:
+        filter = (_) => true;
+        break;
+    }
+
+    return this.roiPointsByStack
+      .flatMap((v) => Object.values(v))
+      .filter((v) => v.diffData !== undefined && filter(v));
+  };
+
+  removeData = (histogramRegion: HistogramRegion): boolean => {
+    if (!this.loaded) {
+      return false;
+    }
+    let didChange = false;
+    switch (histogramRegion) {
+      case HistogramRegion.lastRoi:
+        if (this.lastRoiUuid !== undefined) {
+          for (const arr of this.roiPointsByStack) {
+            if (arr !== undefined && arr[this.lastRoiUuid] !== undefined) {
+              delete arr[this.lastRoiUuid];
+              didChange = true;
+            }
+          }
+        }
+        break;
+      case HistogramRegion.stackPosition:
+        const index = this.currentStackIndex();
+        didChange =
+          this.roiPointsByStack[index] !== undefined &&
+          Object.keys(this.roiPointsByStack[index]).length > 0;
+        this.roiPointsByStack[index] = {};
+        break;
+      case HistogramRegion.volume:
+        didChange = this.roiPointsByStack.length > 0;
+        this.roiPointsByStack = [];
+        break;
+    }
+    if (didChange) {
+      cornerstoneTools.clearToolState(this.getElement(), ToolName.FreehandRoi);
+      cornerstone.updateImage(this.getElement(), true);
+    }
+    return didChange;
+  };
 }
 
 enum InfoView {
@@ -186,9 +233,9 @@ enum HistogramType {
 }
 
 enum HistogramRegion {
-  volume,
-  lastRoi,
-  stackPosition,
+  volume = 'volume',
+  lastRoi = 'lastRoi',
+  stackPosition = 'stackPosition',
 }
 
 @Component({
@@ -385,26 +432,6 @@ export class AppComponent {
       this.imageDataRight.lastRoiUuid = rightRoiData.uuid;
     }
 
-    const leftBBox = getBoundingBox(leftRoiData.handles.points);
-    const leftPixels = cornerstone.getPixels(
-      leftRoiData.element,
-      leftBBox.left,
-      leftBBox.top,
-      leftBBox.width,
-      leftBBox.height
-    );
-
-    // this._drawRoiInCanvas(targetPixels, targetBBox);
-
-    const rightBBox = getBoundingBox(rightRoiData.handles.points);
-    const rightPixels = cornerstone.getPixels(
-      rightRoiData.element,
-      rightBBox.left,
-      rightBBox.top,
-      rightBBox.width,
-      rightBBox.height
-    );
-
     this.imageDataRight.setPoints(
       stackIndex,
       rightRoiData.uuid,
@@ -538,12 +565,13 @@ export class AppComponent {
     }
   };
 
-  clearTool = (): void => {
-    if (this.enabledTool !== this.defaultTool) {
-      for (const data of [this.imageDataLeft, this.imageDataRight]) {
-        data.clearData();
+  clearTool = (histogramRegion: HistogramRegion): void => {
+    for (const data of [this.imageDataLeft, this.imageDataRight]) {
+      if (data.removeData(histogramRegion)) {
+        this.synchronizeRoiPoints(data);
       }
     }
+    this.imageDataLeft.getElement().click();
   };
 
   toggleTool = (toolName: ToolName): void => {
@@ -724,28 +752,34 @@ export class AppComponent {
           direction: 1 | -1;
         };
         this.stackPosition = eDetail.newImageIdIndex;
-        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        if ([this.imageDataLeft, this.imageDataRight].every((d) => d.loaded)) {
+          let retries = 0;
+          while (
+            retries < 5 &&
+            this.imageDataLeft.currentStackIndex() !==
+              this.imageDataRight.currentStackIndex()
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            retries++;
+          }
+        }
 
         for (const d of [this.imageDataLeft, this.imageDataRight]) {
-          if (!d.loaded) {
-            continue;
-          }
-          if (eDetail.newImageIdIndex !== d.currentStackIndex()) {
+          if (!d.loaded || eDetail.newImageIdIndex !== d.currentStackIndex()) {
             return;
           }
           const stackPointCurr = d.currentStackPoints(eDetail.newImageIdIndex);
           const elem = d.getElement();
-          const shouldUpdate = this.synchronizeRoiPoints(
-            elem,
-            stackPointCurr ?? {}
-          );
-          if (
-            shouldUpdate ||
-            !!stackPointCurr ||
-            !!d.currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
-          ) {
-            cornerstone.updateImage(elem, true);
-          }
+          const shouldUpdate = this.synchronizeRoiPoints(d);
+          cornerstone.updateImage(elem, true);
+          // if (
+          //   shouldUpdate ||
+          //   !!stackPointCurr ||
+          //   !!d.currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
+          // ) {
+          //   cornerstone.updateImage(elem, true);
+          // }
         }
       }
     );
@@ -764,10 +798,9 @@ export class AppComponent {
     data.loading = false;
   };
 
-  synchronizeRoiPoints = (
-    elem: HTMLElement,
-    stackPointCurr: { [key: string]: ImageStackData }
-  ): boolean => {
+  synchronizeRoiPoints = (data: ImageData): boolean => {
+    const elem = data.getElement();
+    const stackPointCurr = data.currentStackPoints() ?? {};
     const state = cornerstoneTools.getToolState(elem, ToolName.FreehandRoi) ?? {
       data: [],
     };
@@ -829,7 +862,8 @@ export class AppComponent {
           diffData?.imageId !== this.imageDataLeft.imageId ||
           !roisAreEqual(diffData?.points, leftData.points)
         ) {
-          const right = rightDataList[i].pixels;
+          const rightData = rightDataList[i];
+          const right = rightData.pixels;
           const left = leftData.pixels;
           const bbox = leftData.bbox;
 
@@ -883,6 +917,11 @@ export class AppComponent {
           this.imageDataLeft.currentStackPoints()[
             leftData.uuid
           ].diffData = diffData;
+          this.imageDataRight.currentStackPoints()[rightData.uuid].diffData = {
+            ...diffData,
+            points: rightData.points.map((p) => ({ ...p })),
+            imageId: this.imageDataRight.imageId,
+          };
         }
 
         for (const p of diffData.array) {
@@ -899,24 +938,8 @@ export class AppComponent {
   };
 
   updateVolumeStats = () => {
-    let filter: (d: ImageStackData) => boolean;
-    switch (this.selectedHistogramRegion) {
-      case HistogramRegion.lastRoi:
-        filter = (d) => d.uuid === this.imageDataLeft.lastRoiUuid;
-        break;
-      case HistogramRegion.stackPosition:
-        const curr = this.imageDataLeft.currentStackPoints();
-        filter = (d) => curr !== undefined && curr[d.uuid] !== undefined;
-        break;
-      case HistogramRegion.volume:
-        filter = (_) => true;
-        break;
-    }
-
-    const difList = this.imageDataLeft.roiPointsByStack
-      .flatMap((v) => Object.values(v))
-      .filter((v) => v.diffData !== undefined && filter(v));
-    if (difList.length === 0){
+    const difList = this.imageDataLeft.getData(this.selectedHistogramRegion);
+    if (difList.length === 0) {
       return;
     }
     this.drawHistogram(difList.flatMap((d) => d.diffData.array));
@@ -953,9 +976,8 @@ export class AppComponent {
           return previous + Math.pow(p.diff - diffMean, 2);
         }, 0) / stats.count;
 
-    const statsRight = this.imageDataRight.roiPointsByStack
-      .flatMap((v) => Object.values(v))
-      .filter((v) => v.stats !== undefined && filter(v))
+    const statsRight = this.imageDataRight
+      .getData(this.selectedHistogramRegion)
       .reduce(
         (previous, { stats }) => {
           previous.rightSum += stats.mean * stats.count;

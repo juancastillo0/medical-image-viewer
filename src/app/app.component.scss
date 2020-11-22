@@ -81,14 +81,52 @@
     min-height: 20px;
     margin-top: 1px;
   }
-  input[type="range"]{
-    width: 95px
+  input[type="range"] {
+    width: 95px;
   }
 }
 
 #canvasComp {
   height: 250px;
   width: 250px;
+}
+
+/* Style The Dropdown Button */
+.dropdown-button {
+  min-width: 110px;
+  border-radius: 0;
+}
+
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  width: 100%;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* Links inside the dropdown */
+.dropdown-content button {
+  width: 100%;
+  border-radius: 0;
+}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* Change the background color of the dropdown button when the dropdown content is shown */
+.dropdown:hover .dropdown-button {
+  background-color: #eeeeee;
 }
 
 /*! cornerstone - v0.9.0 - 2016-02-03 | (c) 2014 Chris Hafey | https://github.com/chafey/cornerstone */

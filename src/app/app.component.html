@@ -29,7 +29,22 @@
       <button (click)="toggleTool(ToolName.FreehandRoi)"
         [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">ROI Tool</button>
     </div>
-    <button (click)="clearTool()">Clear</button>
+    <!-- <button (click)="clearTool()">Clear</button> -->
+    <div class="dropdown">
+      <button class="dropdown-button" ngPreserveWhitespaces
+        style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
+      <div class="dropdown-content">
+        <button (click)="clearTool(HistogramRegion.lastRoi)">Last ROI</button>
+        <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
+        <button (click)="clearTool(HistogramRegion.volume)">Volume</button>
+      </div>
+    </div>
+    <!-- <select (input)="clearTool(selectClear)" #selectClear (click)="showClearSelection = !showClearSelection">
+      <option *ngIf="showClearSelection" value="null" disabled [selected]="true">Clear</option>
+      <option value={{HistogramRegion.lastRoi}} [selected]="false">Last ROI</option>
+      <option value={{HistogramRegion.stackPosition}} [selected]="false">Stack Position</option>
+      <option value={{HistogramRegion.volume}} [selected]="false">Volume</option>
+    </select> -->
     <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
       {{stackPosition + 1}}/{{stackSize}}
     </div>
