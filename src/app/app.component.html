@@ -31,8 +31,7 @@
     </div>
     <!-- <button (click)="clearTool()">Clear</button> -->
     <div class="dropdown">
-      <button class="dropdown-button" ngPreserveWhitespaces
-        style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
+      <button class="dropdown-button" ngPreserveWhitespaces style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
       <div class="dropdown-content">
         <button (click)="clearTool(HistogramRegion.lastRoi)">Last ROI</button>
         <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
@@ -192,6 +191,10 @@
               <td>Std.</td>
               <td>{{volumeStats.stdLeft}}</td>
             </tr>
+            <tr>
+              <td>Area</td>
+              <td>{{volumeStats.areaLeft}} mm²</td>
+            </tr>
             <h4>Right</h4>
             <tr>
               <td>Mean</td>
@@ -200,6 +203,10 @@
             <tr>
               <td>Std.</td>
               <td>{{volumeStats.stdRight}}</td>
+            </tr>
+            <tr>
+              <td>Area</td>
+              <td>{{volumeStats.areaRight}} mm²</td>
             </tr>
             <h4>Difference</h4>
             <tr>
@@ -210,14 +217,14 @@
               <td>Std.</td>
               <td>{{volumeStats.std}}</td>
             </tr>
-            <tr>
+            <!-- <tr>
               <td>Max</td>
               <td>{{volumeStats.max}}</td>
             </tr>
             <tr>
               <td>Min</td>
               <td>{{volumeStats.min}}</td>
-            </tr>
+            </tr> -->
           </table>
         </div>
         <div class="col" [style.display]="volumeStats !== undefined ? undefined: 'none'">

@@ -74,7 +74,7 @@ type ImageStackData = {
     count: number;
     mean: number;
     variance: number;
-    stdDev: number;
+    area: number;
   };
 };
 
@@ -118,23 +118,17 @@ class ImageData {
     return this.roiPointsByStack[stackIndex];
   };
 
-  setPoints = (
-    stackIndex: number,
-    uuid: string,
-    points: Array<Offset>,
-    stats: {
-      count: number;
-      mean: number;
-      variance: number;
-      stdDev: number;
-    }
-  ): void => {
+  setPoints = (stackIndex: number, data: RoiData): void => {
     let map = this.roiPointsByStack[stackIndex];
     if (!map) {
       map = {};
       this.roiPointsByStack[stackIndex] = map;
     }
-    map[uuid] = { uuid, points: points.map((p) => ({ ...p })), stats };
+    map[data.uuid] = {
+      uuid: data.uuid,
+      points: data.handles.points.map((p) => ({ ...p })),
+      stats: { ...data.meanStdDev, area: data.area },
+    };
   };
 
   getRoiPixels = (): Array<{
@@ -274,6 +268,8 @@ export class AppComponent {
     meanRight: number;
     stdLeft: number;
     stdRight: number;
+    areaLeft: number;
+    areaRight: number;
   };
 
   imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement);
@@ -432,18 +428,8 @@ export class AppComponent {
       this.imageDataRight.lastRoiUuid = rightRoiData.uuid;
     }
 
-    this.imageDataRight.setPoints(
-      stackIndex,
-      rightRoiData.uuid,
-      rightRoiData.handles.points,
-      rightRoiData.meanStdDev
-    );
-    this.imageDataLeft.setPoints(
-      stackIndex,
-      leftRoiData.uuid,
-      leftRoiData.handles.points,
-      leftRoiData.meanStdDev
-    );
+    this.imageDataRight.setPoints(stackIndex, rightRoiData);
+    this.imageDataLeft.setPoints(stackIndex, leftRoiData);
 
     cornerstone.updateImage(this.imageDataLeft.getElement(), true);
     cornerstone.updateImage(this.imageDataRight.getElement(), true);
@@ -714,9 +700,9 @@ export class AppComponent {
       columnPixelSpacing: firstImage.columnPixelSpacing,
       rowPixelSpacing: firstImage.rowPixelSpacing,
       invert: false,
-      sizeInBytes: firstImage.height * firstImage.width * 2,
+      sizeInBytes: firstImage.height * firstImage.width,
       data: {
-        rawPixels: new Uint16Array(firstImage.height * firstImage.width),
+        rawPixels: new Uint8Array(firstImage.height * firstImage.width),
       },
     };
     const colormap = cornerstone.colors.getColormap(this.selectedColormap);
@@ -760,7 +746,7 @@ export class AppComponent {
             this.imageDataLeft.currentStackIndex() !==
               this.imageDataRight.currentStackIndex()
           ) {
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 20));
             retries++;
           }
         }
@@ -848,7 +834,7 @@ export class AppComponent {
       if (numIterations === 0) {
         return data.dynamicImage.data.rawPixels;
       }
-      const rawPixels = new Uint16Array(
+      const rawPixels = new Uint8Array(
         data.dynamicImage.height * data.dynamicImage.width
       );
 
@@ -874,9 +860,10 @@ export class AppComponent {
           let sumDiff = 0;
           for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
             for (let x = bbox.left; x < bbox.left + bbox.width; x++) {
-              const inFreehand = this.cornerstoneService.pointInFreehand(
+              const inFreehand = this.cornerstoneService.pointInFreehand2(
                 leftData.points,
-                { x, y }
+                { x, y },
+                bbox
               );
               if (inFreehand) {
                 const diff = left[index] - right[index];
@@ -954,6 +941,7 @@ export class AppComponent {
         previous.leftSum += stats.mean * stats.count;
         previous.leftCount += stats.count;
         previous.leftVarianceSum += stats.variance * stats.count;
+        previous.area += stats.area;
         return previous;
       },
       {
@@ -965,6 +953,7 @@ export class AppComponent {
         leftCount: 0,
         leftSum: 0,
         leftVarianceSum: 0,
+        area: 0,
       }
     );
     const diffMean = stats.sum / stats.count;
@@ -980,15 +969,17 @@ export class AppComponent {
       .getData(this.selectedHistogramRegion)
       .reduce(
         (previous, { stats }) => {
-          previous.rightSum += stats.mean * stats.count;
-          previous.rightCount += stats.count;
+          previous.sum += stats.mean * stats.count;
+          previous.count += stats.count;
           previous.varianceSum += stats.variance * stats.count;
+          previous.area += stats.area;
           return previous;
         },
         {
-          rightCount: 0,
-          rightSum: 0,
+          count: 0,
+          sum: 0,
           varianceSum: 0,
+          area: 0,
         }
       );
 
@@ -999,12 +990,16 @@ export class AppComponent {
         ...stats,
         mean: toFloatStr(diffMean),
         std: toFloatStr(Math.sqrt(diffVariance)),
+        //
         meanLeft: toFloatStr(stats.leftSum / stats.leftCount),
         stdLeft: toFloatStr(Math.sqrt(stats.leftVarianceSum / stats.leftCount)),
-        meanRight: toFloatStr(statsRight.rightSum / statsRight.rightCount),
+        areaLeft: toFloatStr(stats.area),
+        //
+        meanRight: toFloatStr(statsRight.sum / statsRight.count),
         stdRight: toFloatStr(
-          Math.sqrt(statsRight.varianceSum / statsRight.rightCount)
+          Math.sqrt(statsRight.varianceSum / statsRight.count)
         ),
+        areaRight: toFloatStr(statsRight.area),
       };
     }
   };

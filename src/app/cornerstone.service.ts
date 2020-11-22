@@ -58,6 +58,97 @@ export class CornerstoneService {
     point: { x: number; y: number }
   ) => boolean;
 
+  pointInFreehand2 = (
+    polygon: { x: number; y: number }[],
+    p: { x: number; y: number },
+    bbox?: { left: number; top: number; right: number; bottom: number }
+  ): boolean => {
+    let isInside = false;
+    const box = bbox ?? getBoundingBox(polygon);
+    if (
+      p.x < box.left ||
+      p.x > box.right ||
+      p.y < box.top ||
+      p.y > box.bottom
+    ) {
+      return false;
+    }
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      if (
+        polygon[i].y > p.y !== polygon[j].y > p.y &&
+        p.x <
+          ((polygon[j].x - polygon[i].x) * (p.y - polygon[i].y)) /
+            (polygon[j].y - polygon[i].y) +
+            polygon[i].x
+      ) {
+        isInside = !isInside;
+      }
+    }
+
+    return isInside;
+  };
+
+  pointInFreehandCached = (
+    polygon: { x: number; y: number }[],
+    p: { x: number; y: number }
+  ): boolean => {
+    let isInside = false;
+    const coeff: number[] = [];
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      coeff.push((polygon[j].x - polygon[i].x) / (polygon[j].y - polygon[i].y));
+      if (
+        polygon[i].y > p.y !== polygon[j].y > p.y &&
+        p.x <
+          ((polygon[j].x - polygon[i].x) * (p.y - polygon[i].y)) /
+            (polygon[j].y - polygon[i].y) +
+            polygon[i].x
+      ) {
+        isInside = !isInside;
+      }
+    }
+
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      if (
+        polygon[i].y > p.y !== polygon[j].y > p.y &&
+        p.x < coeff[i] * (p.y - polygon[i].y) + polygon[i].x
+      ) {
+        isInside = !isInside;
+      }
+    }
+
+    return isInside;
+  };
+
+  lineInFreehand = (
+    y: number,
+    polygon: { x: number; y: number }[],
+    xs: number[]
+  ): boolean[] => {
+    const coeff = Array<number>(polygon.length);
+    const bools = Array<boolean>(polygon.length);
+    const results = Array<boolean>(xs.length).map((_) => false);
+
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      coeff[i] =
+        ((polygon[j].x - polygon[i].x) * (y - polygon[i].y)) /
+          (polygon[j].y - polygon[i].y) +
+        polygon[i].x;
+      bools[i] = polygon[i].y > y !== polygon[j].y > y;
+    }
+
+    for (let i = 0; i < polygon.length; i++) {
+      const b = bools[i];
+      const c = coeff[i];
+      xs.forEach((x, ind) => {
+        if (b && x < c) {
+          results[ind] = !results[ind];
+        }
+      });
+    }
+
+    return results;
+  };
+
   constructor() {
     cornerstoneNIFTIImageLoader.external.cornerstone = cornerstone;
     cornerstoneTools.external.cornerstone = cornerstone;
@@ -338,3 +429,39 @@ export class CornerstoneService {
     };
   };
 }
+
+// let _x = Math.round(bbox.left);
+// const xs = Array(Math.round(bbox.width)).map((_) => _x++);
+// for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
+//   this.cornerstoneService
+//     .lineInFreehand(y, leftData.points, xs)
+//     .map((inFreehand, ii) => {
+//       if (inFreehand) {
+//         const x = _x[ii];
+//         const diff = left[index] - right[index];
+//         if (isNaN(diff)) {
+//           console.log(
+//             x,
+//             y,
+//             index,
+//             left[index],
+//             right[index],
+//             left.length,
+//             right.length
+//           );
+//         }
+//         maxDiff = Math.max(maxDiff, diff);
+//         minDiff = Math.min(minDiff, diff);
+//         sumDiff += diff;
+
+//         differencePixels.push({
+//           left: left[index],
+//           right: right[index],
+//           index:
+//             Math.round(y) * data.dynamicImage.width + Math.round(x),
+//           diff,
+//         });
+//       }
+//       index++;
+//     });
+// }
