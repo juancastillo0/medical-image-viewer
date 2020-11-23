@@ -91,6 +91,15 @@
   width: 250px;
 }
 
+.select-fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  select {
+    width: 130px;
+  }
+}
+
 /* Style The Dropdown Button */
 .dropdown-button {
   min-width: 110px;

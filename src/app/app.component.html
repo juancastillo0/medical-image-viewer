@@ -12,12 +12,14 @@
 
 <div class="col">
   <div class="row" id="top-menu">
-    <select *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" name="select-image" id="selectImageLeft"
-      (input)="changeImage(selectImageLeft, imageDataLeft)" #selectImageLeft>
-      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-        [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
-      <option value="IMPORT" [selected]="false">Import Image</option>
-    </select>
+    <fieldset class="select-fieldset">
+      <select *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" name="select-image" id="selectImageLeft"
+        (input)="changeImage(selectImageLeft, imageDataLeft)" #selectImageLeft>
+        <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+          [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
+        <option value="IMPORT" [selected]="false">Import Image</option>
+      </select>
+    </fieldset>
     <div class="col">
       <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
       <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
@@ -53,12 +55,14 @@
         <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
       </select>
     </div>
-    <select *ngIf="imageDataRight.loaded || importedImageIds.size > 1" name="select-image" id="selectImageRight"
-      (input)="changeImage(selectImageRight, imageDataRight)" #selectImageRight>
-      <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-        [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
-      <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
-    </select>
+    <fieldset class="select-fieldset">
+      <select *ngIf="imageDataRight.loaded || importedImageIds.size > 1" name="select-image" id="selectImageRight"
+        (input)="changeImage(selectImageRight, imageDataRight)" #selectImageRight>
+        <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+          [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
+        <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
+      </select>
+    </fieldset>
     <div class="col">
       <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
       <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
@@ -227,7 +231,7 @@
             </tr> -->
           </table>
         </div>
-        <div class="col" [style.display]="volumeStats !== undefined ? undefined: 'none'">
+        <div class="col" [style.display]="volumeStats !== undefined ? undefined: 'none'" style="padding-right: 14px;">
           <h4>Distribution</h4>
           <div id="distChart" style="flex: 1;"
             [style.display]="selectedHistogram === HistogramType.dist ? undefined: 'none'">

@@ -314,7 +314,7 @@ export class AppComponent {
       document.getElementById(_elemId).click();
     } else if (selectElem.value !== imageData.imageId) {
       const imageIds = this.importedImageIds.get(selectElem.value);
-      this.loadAndViewImages(imageIds, imageData);
+      this.loadAndViewImages(selectElem.value, imageIds, imageData, false);
     }
   };
 
@@ -539,7 +539,11 @@ export class AppComponent {
       files.push(file);
     }
     if (files.length > 0) {
-      const imageIds: string[] = files.map((file) => {
+      let firstFileName: string;
+      const imageIds: string[] = files.map((file, index) => {
+        if (index === 0) {
+          firstFileName = file.name;
+        }
         if (file.type === 'application/x-gzip') {
           const url = URL.createObjectURL(file);
           const imageId = `nifti:${url}`;
@@ -547,7 +551,7 @@ export class AppComponent {
         }
         return cornerstoneWADOImageLoader.wadouri.fileManager.add(file);
       });
-      this.loadAndViewImages(imageIds, data);
+      this.loadAndViewImages(firstFileName, imageIds, data, true);
     }
   };
 
@@ -586,8 +590,10 @@ export class AppComponent {
     data === this.imageDataLeft ? this.imageDataRight : this.imageDataLeft;
 
   loadAndViewImages = async (
+    fileName: string,
     imageIds: Array<string>,
-    data: ImageData
+    data: ImageData,
+    isNewImport: boolean
   ): Promise<void> => {
     // if (data.loaded){
     //   data.getElement().hidden = false;
@@ -672,9 +678,20 @@ export class AppComponent {
     cornerstoneTools.addToolState(element, 'stack', stack);
     this.stackPosition = stack.currentImageIdIndex;
     this.stackSize = stack.imageIds.length;
-    data.imageId = firstImage.imageId;
-    this.importedImageIds.set(firstImage.imageId, stack.imageIds);
     data.layerId = cornerstone.addLayer(element, firstImage, { opacity: 1 });
+
+    // const _imageId = (firstImage.imageId.startsWith('nifti')
+    //   ? fileName
+    //   : firstImage.imageId
+    // ).substring(0, 14);
+    if (isNewImport) {
+      data.imageId = fileName;
+      let _i = 1;
+      while (this.importedImageIds.has(data.imageId)) {
+        data.imageId = fileName + _i++;
+      }
+      this.importedImageIds.set(data.imageId, stack.imageIds);
+    }
 
     // const viewport = cornerstone.getDefaultViewportForImage(
     //   element,
