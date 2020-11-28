@@ -234,6 +234,7 @@ export class CornerstoneService {
       target: RoiData & { element: HTMLElement },
       source: RoiData & { element: HTMLElement }
     ) => void;
+    getImageVisibility: (element: HTMLElement) => boolean;
   }): SynchronizerCallback => (
     synchronizer,
     targetElement,
@@ -250,6 +251,7 @@ export class CornerstoneService {
         target: RoiData & { element: HTMLElement },
         source: RoiData & { element: HTMLElement }
       ) => void;
+      getImageVisibility: (element: HTMLElement) => boolean;
     },
     targetElement: HTMLElement,
     sourceElement: HTMLElement
@@ -300,9 +302,10 @@ export class CornerstoneService {
     const addData = (element: HTMLElement, dataList: RoiData[]) => {
       const image = cornerstone.getImage(element);
       // Get the source and target viewports
-
+      const visible = callbacks.getImageVisibility(element);
       for (const data of dataList) {
-        const newData = { ...data };
+        console.log(data, visible);
+        const newData = { ...data, visible: data.area < 0.1 || visible};
         newData.handles = { ...newData.handles };
         newData.handles.points = newData.handles.points.map((p) => ({
           ...p,
@@ -374,7 +377,7 @@ export class CornerstoneService {
               { ...dataSource, element: sourceElement }
             );
           } else {
-            console.log(dataTarget);
+            dataSource.visible = true;
           }
         }
       }
@@ -393,7 +396,7 @@ export class CornerstoneService {
     }
   };
 
-  createRoiData = (uuid: string, points: Offset[]): RoiData => {
+  createRoiData = (uuid: string, points: Offset[], visibility: boolean): RoiData => {
     return {
       active: false,
       area: 10,
@@ -424,7 +427,7 @@ export class CornerstoneService {
       },
       unit: '',
       uuid,
-      visible: true,
+      visible: visibility,
       polyBoundingBox: getBoundingBox(points),
     };
   };

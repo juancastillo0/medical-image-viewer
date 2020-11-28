@@ -85,6 +85,7 @@ class ImageData {
 
   loading = false;
   loaded = false;
+  visible = true;
   opacity = 0.7;
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
@@ -349,6 +350,17 @@ export class AppComponent {
     }
   };
 
+  updateLayerVisibility = (imageData: ImageData) => {
+    // for (const points of imageData.roiPointsByStack.flatMap((p) =>
+    //   Object.values(p ?? {})
+    // )) {
+    //   points.visibility = visibility;
+    // }
+    // console.log(visibility);
+    imageData.visible = !imageData.visible;
+    this.synchronizeRoiPoints(imageData);
+  };
+
   _drawRoiInCanvas = (targetPixels: Array<number>, targetBBox: BBox) => {
     const canvas = this.canvasElem;
     if (canvas === undefined) {
@@ -411,6 +423,8 @@ export class AppComponent {
       leftRoiData = source;
       rightRoiData = target;
     }
+    leftRoiData.visible = this.imageDataLeft.visible;
+    rightRoiData.visible = this.imageDataRight.visible;
 
     const stackIndex = this.imageDataLeft.currentStackIndex();
     const stackPoints = this.imageDataLeft.currentStackPoints(stackIndex);
@@ -824,16 +838,17 @@ export class AppComponent {
         cornerstoneTools.addToolState(
           elem,
           ToolName.FreehandRoi,
-          this.cornerstoneService.createRoiData(key, value)
+          this.cornerstoneService.createRoiData(key, value, data.visible)
         );
       } else {
-        map.get(key).handles.points.forEach((p, index) => {
+        const d = map.get(key);
+        d.handles.points.forEach((p, index) => {
           result = result || p.x !== value[index].x || p.y !== value[index].y;
           p.x = value[index].x;
           p.y = value[index].y;
         });
-        // if (roisAreDifferent(d.handles.points, value)) {
-        // }
+        result = result || d.visible !== data.visible;
+        d.visible = data.visible;
       }
     });
     if (result) {
@@ -1038,6 +1053,11 @@ export class AppComponent {
         `click`,
         this.cornerstoneService.freehandRoiSynchronizer({
           onUpdateCompleted: this.drawCompCanvas,
+          getImageVisibility: (d) =>
+            // true
+            this.imageDataLeft.getElement() === d
+              ? this.imageDataLeft.visible
+              : this.imageDataRight.visible,
         })
       );
 
@@ -1053,7 +1073,10 @@ export class AppComponent {
               ToolName.FreehandRoi
             ) as any).cancelDrawing(el);
             this.cornerstoneService.syncronize(
-              { onUpdateCompleted: (_, __) => {} },
+              {
+                onUpdateCompleted: (_, __) => {},
+                getImageVisibility: (d) => true,
+              },
               el,
               this.otherData(data).getElement()
             );

@@ -12,16 +12,21 @@
 
 <div class="col">
   <div class="row" id="top-menu">
-    <fieldset class="select-fieldset">
-      <select *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" name="select-image" id="selectImageLeft"
-        (input)="changeImage(selectImageLeft, imageDataLeft)" #selectImageLeft>
+    <fieldset *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" class="select-fieldset">
+      <label class="small-label" for="selectImageLeft">Image import</label>
+      <select name="select-image" id="selectImageLeft" (input)="changeImage(selectImageLeft, imageDataLeft)"
+        #selectImageLeft>
         <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
           [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
         <option value="IMPORT" [selected]="false">Import Image</option>
       </select>
     </fieldset>
     <div class="col">
-      <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
+      <div class="row" style="justify-content: space-between;">
+        <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
+        <input type="checkbox" id="layerVisibilityLeft" [checked]="imageDataLeft.visible"
+          (change)="updateLayerVisibility(imageDataLeft)" #layerVisibilityLeft>
+      </div>
       <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
         (change)="updateLayerOpacity(layerOpacityLeft.value, imageDataLeft)" #layerOpacityLeft>
     </div>
@@ -55,16 +60,21 @@
         <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
       </select>
     </div>
-    <fieldset class="select-fieldset">
-      <select *ngIf="imageDataRight.loaded || importedImageIds.size > 1" name="select-image" id="selectImageRight"
-        (input)="changeImage(selectImageRight, imageDataRight)" #selectImageRight>
+    <fieldset *ngIf="imageDataRight.loaded || importedImageIds.size > 1" class="select-fieldset">
+      <label class="small-label" for="selectImageRight">Image import</label>
+      <select name="select-image" id="selectImageRight" (input)="changeImage(selectImageRight, imageDataRight)"
+        #selectImageRight>
         <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
           [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
         <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
       </select>
     </fieldset>
     <div class="col">
-      <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
+      <div class="row" style="justify-content: space-between;">
+        <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
+        <input type="checkbox" id="layerVisibilityRight" [checked]="imageDataRight.visible"
+          (change)="updateLayerVisibility(imageDataRight)" #layerVisibilityRight>
+      </div>
       <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
         (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
     </div>
