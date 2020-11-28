@@ -89,6 +89,11 @@ export class ImageMetadataService {
     otherData.forEach(([value, key]) => {
       summary[value] = '' + getMetaData(key)[value];
     });
+    Object.entries(getMetaData('imagePlaneModule')).forEach(([key, value]) => {
+      if (key !== 'frameOfReferenceUID') {
+        summary[key] = '' + value;
+      }
+    });
 
     return summary;
   };
