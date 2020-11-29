@@ -230,11 +230,9 @@ export class CornerstoneService {
     synchronizer.setViewport(targetElement, targetViewport);
   };
   freehandRoiSynchronizer = (callbacks: {
-    onUpdateCompleted: (
-      target: RoiData & { element: HTMLElement },
-      source: RoiData & { element: HTMLElement }
-    ) => void;
+    onUpdateCompleted: (data: RoiData, element: HTMLElement) => void;
     getImageVisibility: (element: HTMLElement) => boolean;
+    shouldSynchronize: () => boolean;
   }): SynchronizerCallback => (
     synchronizer,
     targetElement,
@@ -247,11 +245,9 @@ export class CornerstoneService {
 
   syncronize = (
     callbacks: {
-      onUpdateCompleted: (
-        target: RoiData & { element: HTMLElement },
-        source: RoiData & { element: HTMLElement }
-      ) => void;
+      onUpdateCompleted: (data: RoiData, element: HTMLElement) => void;
       getImageVisibility: (element: HTMLElement) => boolean;
+      shouldSynchronize: () => boolean;
     },
     targetElement: HTMLElement,
     sourceElement: HTMLElement
@@ -278,20 +274,14 @@ export class CornerstoneService {
       ToolName.FreehandRoi
     )?.data;
 
-    const updateImageAndDataFactory = (
-      element: HTMLElement,
-      dataList: RoiData[]
-    ) => {
-      const image = cornerstone.getImage(element);
-      for (const data of dataList) {
-        if (data.area > 0.1 || data.canComplete) {
-          (_tool as any).updateCachedStats(image, element, data);
-        } else {
-          // console.log(data);
+    if (!callbacks.shouldSynchronize()) {
+      for (const dataTarget of targetRois) {
+        if (dataTarget.area > 0.1 || dataTarget.canComplete) {
+          callbacks.onUpdateCompleted(dataTarget, targetElement);
         }
       }
-      cornerstone.updateImage(element);
-    };
+      return;
+    }
     const sourceViewport = cornerstone.getViewport(sourceElement);
     const targetViewport = cornerstone.getViewport(targetElement);
 
@@ -305,7 +295,7 @@ export class CornerstoneService {
       const visible = callbacks.getImageVisibility(element);
       for (const data of dataList) {
         console.log(data, visible);
-        const newData = { ...data, visible: data.area < 0.1 || visible};
+        const newData = { ...data, visible: data.area < 0.1 || visible };
         newData.handles = { ...newData.handles };
         newData.handles.points = newData.handles.points.map((p) => ({
           ...p,
@@ -361,21 +351,18 @@ export class CornerstoneService {
             y: p.y * ratio,
           }));
           if (dataTarget.area > 0.1 || dataTarget.canComplete) {
-            (_tool as any).updateCachedStats(
-              targetImage,
-              targetElement,
-              dataTarget
-            );
-            (_tool as any).updateCachedStats(
-              sourceImage,
-              sourceElement,
-              dataSource
-            );
-
-            callbacks.onUpdateCompleted(
-              { ...dataTarget, element: targetElement },
-              { ...dataSource, element: sourceElement }
-            );
+            // (_tool as any).updateCachedStats(
+            //   targetImage,
+            //   targetElement,
+            //   dataTarget
+            // );
+            // (_tool as any).updateCachedStats(
+            //   sourceImage,
+            //   sourceElement,
+            //   dataSource
+            // );
+            callbacks.onUpdateCompleted(dataSource, sourceElement);
+            callbacks.onUpdateCompleted(dataTarget, targetElement);
           } else {
             dataSource.visible = true;
           }
@@ -396,7 +383,11 @@ export class CornerstoneService {
     }
   };
 
-  createRoiData = (uuid: string, points: Offset[], visibility: boolean): RoiData => {
+  createRoiData = (
+    uuid: string,
+    points: Offset[],
+    visibility: boolean
+  ): RoiData => {
     return {
       active: false,
       area: 10,

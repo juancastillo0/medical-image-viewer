@@ -55,7 +55,14 @@ type ParsingResult =
       parsingError: string;
     };
 
-type DiffPoint = { left: number; right: number; index: number; diff: number };
+type DiffPoint = {
+  x: number;
+  y: number;
+  left: number;
+  right: number;
+  index: number;
+  diff: number;
+};
 
 type DiffData = {
   array: Array<DiffPoint>;
@@ -79,13 +86,19 @@ type ImageStackData = {
 };
 
 class ImageData {
-  constructor(getElement: () => HTMLDivElement) {
+  constructor(
+    getElement: () => HTMLDivElement,
+    { isLeft }: { isLeft: boolean }
+  ) {
     this.getElement = getElement;
+    this.isLeft = isLeft;
   }
+  isLeft: boolean;
 
   loading = false;
   loaded = false;
   visible = true;
+  synchronized = true;
   opacity = 0.7;
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
@@ -273,8 +286,14 @@ export class AppComponent {
     areaRight: number;
   };
 
-  imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement);
-  imageDataRight = new ImageData(() => this._dicomImageRightElem.nativeElement);
+  imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement, {
+    isLeft: true,
+  });
+  imageDataRight = new ImageData(
+    () => this._dicomImageRightElem.nativeElement,
+    { isLeft: false }
+  );
+  selectedSide: ImageData;
 
   get allLoaded(): boolean {
     (window as any).dataL = this.imageDataLeft;
@@ -351,14 +370,13 @@ export class AppComponent {
   };
 
   updateLayerVisibility = (imageData: ImageData) => {
-    // for (const points of imageData.roiPointsByStack.flatMap((p) =>
-    //   Object.values(p ?? {})
-    // )) {
-    //   points.visibility = visibility;
-    // }
-    // console.log(visibility);
     imageData.visible = !imageData.visible;
     this.synchronizeRoiPoints(imageData);
+    cornerstone.updateImage(imageData.getElement());
+  };
+
+  updateRoiSynchronization = (imageData: ImageData) => {
+    imageData.synchronized = !imageData.synchronized;
   };
 
   _drawRoiInCanvas = (targetPixels: Array<number>, targetBBox: BBox) => {
@@ -410,43 +428,37 @@ export class AppComponent {
     ctx.stroke();
   };
 
-  drawCompCanvas = (
-    target: RoiData & { element: HTMLElement },
-    source: RoiData & { element: HTMLElement }
-  ) => {
-    let leftRoiData: RoiData & { element: HTMLElement };
-    let rightRoiData: RoiData & { element: HTMLElement };
-    if (target.element.id === this.imageDataLeft.getElement().id) {
-      leftRoiData = target;
-      rightRoiData = source;
+  _onRoiEdited = (data: RoiData, element: HTMLElement) => {
+    let imageData: ImageData;
+    if (element.id === this.imageDataLeft.getElement().id) {
+      imageData = this.imageDataLeft;
     } else {
-      leftRoiData = source;
-      rightRoiData = target;
+      imageData = this.imageDataRight;
     }
-    leftRoiData.visible = this.imageDataLeft.visible;
-    rightRoiData.visible = this.imageDataRight.visible;
+    data.visible = imageData.visible;
 
-    const stackIndex = this.imageDataLeft.currentStackIndex();
-    const stackPoints = this.imageDataLeft.currentStackPoints(stackIndex);
+    const stackIndex = imageData.currentStackIndex();
+    const stackPoints = imageData.currentStackPoints(stackIndex);
+
     if (
       !!stackPoints &&
-      !!stackPoints[leftRoiData.uuid] &&
-      roisAreEqual(
-        stackPoints[leftRoiData.uuid].points,
-        leftRoiData.handles.points
-      )
+      !!stackPoints[data.uuid] &&
+      roisAreEqual(stackPoints[data.uuid].points, data.handles.points)
     ) {
       return;
-    } else {
-      this.imageDataLeft.lastRoiUuid = leftRoiData.uuid;
-      this.imageDataRight.lastRoiUuid = rightRoiData.uuid;
     }
+    const _tool = cornerstoneTools.getToolForElement(
+      element,
+      ToolName.FreehandRoi
+    );
+    const _image = cornerstone.getImage(element);
+    (_tool as any).updateCachedStats(_image, element, data);
 
-    this.imageDataRight.setPoints(stackIndex, rightRoiData);
-    this.imageDataLeft.setPoints(stackIndex, leftRoiData);
+    imageData.lastRoiUuid = data.uuid;
+    imageData.setPoints(stackIndex, data);
+    this.selectedSide = imageData;
 
-    cornerstone.updateImage(this.imageDataLeft.getElement(), true);
-    cornerstone.updateImage(this.imageDataRight.getElement(), true);
+    cornerstone.updateImage(imageData.getElement(), true);
   };
 
   drawHistogram = (points: DiffPoint[]): void => {
@@ -706,11 +718,6 @@ export class AppComponent {
       }
       this.importedImageIds.set(data.imageId, stack.imageIds);
     }
-
-    // const viewport = cornerstone.getDefaultViewportForImage(
-    //   element,
-    //   firstImage
-    // );
     console.log(firstImage);
 
     data.dynamicImage = {
@@ -852,38 +859,50 @@ export class AppComponent {
       }
     });
     if (result) {
-      this.imageDataLeft.getElement().click();
+      data.getElement().click();
     }
     return result;
   };
 
   createGetPixelData = (data: ImageData): (() => number[]) => {
     return () => {
-      const _curr = this.imageDataLeft.currentStackPoints();
-      const leftDataList = this.imageDataLeft.getRoiPixels();
-      const rightDataList = this.imageDataRight.getRoiPixels();
-      const numIterations = Math.min(leftDataList.length, rightDataList.length);
-      if (numIterations === 0) {
+      const _curr = data.currentStackPoints();
+      const dataList = data.getRoiPixels();
+      if (dataList.length === 0) {
         return data.dynamicImage.data.rawPixels;
       }
       const rawPixels = new Uint8Array(
         data.dynamicImage.height * data.dynamicImage.width
       );
+      const otherData = this.otherData(data);
 
-      console.log('createGetPixelData', numIterations);
-
-      for (let i = 0; i < numIterations; i++) {
-        const leftData = leftDataList[i];
-        let diffData: DiffData = _curr[leftData.uuid].diffData;
+      for (let i = 0; i < dataList.length; i++) {
+        const roi = dataList[i];
+        let diffData: DiffData = _curr[roi.uuid].diffData;
 
         if (
           diffData?.imageId !== this.imageDataLeft.imageId ||
-          !roisAreEqual(diffData?.points, leftData.points)
+          !roisAreEqual(diffData?.points, roi.points)
         ) {
-          const rightData = rightDataList[i];
-          const right = rightData.pixels;
-          const left = leftData.pixels;
-          const bbox = leftData.bbox;
+          // TODO: different scale?
+          const otherPixels = cornerstone.getPixels(
+            otherData.getElement(),
+            roi.bbox.left,
+            roi.bbox.top,
+            roi.bbox.width,
+            roi.bbox.height
+          );
+
+          let left: number[];
+          let right: number[];
+          if (data.isLeft) {
+            left = roi.pixels;
+            right = otherPixels;
+          } else {
+            right = roi.pixels;
+            left = otherPixels;
+          }
+          const bbox = roi.bbox;
 
           let index = 0;
           const differencePixels: Array<DiffPoint> = [];
@@ -893,7 +912,7 @@ export class AppComponent {
           for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
             for (let x = bbox.left; x < bbox.left + bbox.width; x++) {
               const inFreehand = this.cornerstoneService.pointInFreehand2(
-                leftData.points,
+                roi.points,
                 { x, y },
                 bbox
               );
@@ -913,13 +932,16 @@ export class AppComponent {
                 maxDiff = Math.max(maxDiff, diff);
                 minDiff = Math.min(minDiff, diff);
                 sumDiff += diff;
+                const xInt = Math.round(x);
+                const yInt = Math.round(y);
 
                 differencePixels.push({
                   left: left[index],
                   right: right[index],
-                  index:
-                    Math.round(y) * data.dynamicImage.width + Math.round(x),
+                  index: yInt * data.dynamicImage.width + xInt,
                   diff,
+                  x: xInt,
+                  y: yInt,
                 });
               }
               index++;
@@ -930,17 +952,19 @@ export class AppComponent {
             max: maxDiff,
             min: minDiff,
             sum: sumDiff,
-            points: leftData.points.map((p) => ({ ...p })),
-            imageId: this.imageDataLeft.imageId,
+            points: roi.points.map((p) => ({ ...p })),
+            imageId: data.imageId,
           };
-          this.imageDataLeft.currentStackPoints()[
-            leftData.uuid
-          ].diffData = diffData;
-          this.imageDataRight.currentStackPoints()[rightData.uuid].diffData = {
-            ...diffData,
-            points: rightData.points.map((p) => ({ ...p })),
-            imageId: this.imageDataRight.imageId,
-          };
+          data.currentStackPoints()[roi.uuid].diffData = diffData;
+
+          // TODO: cache in other side
+          // this.imageDataRight.currentStackPoints()[
+          //   rightData.uuid
+          // ].diffData = {
+          //   ...diffData,
+          //   points: rightData.points.map((p) => ({ ...p })),
+          //   imageId: this.imageDataRight.imageId,
+          // };
         }
 
         for (const p of diffData.array) {
@@ -957,49 +981,84 @@ export class AppComponent {
   };
 
   updateVolumeStats = () => {
-    const difList = this.imageDataLeft.getData(this.selectedHistogramRegion);
-    if (difList.length === 0) {
+    const difListLeft = this.imageDataLeft.getData(
+      this.selectedHistogramRegion
+    );
+    const difListRight = this.imageDataRight.getData(
+      this.selectedHistogramRegion
+    );
+    if (difListLeft.length === 0 && difListRight.length === 0) {
       return;
     }
-    this.drawHistogram(difList.flatMap((d) => d.diffData.array));
 
-    const stats = difList.reduce(
-      (previous, { diffData, stats }) => {
-        previous.count += diffData.array.length;
-        previous.sum += diffData.sum;
-        previous.min = Math.min(previous.min, diffData.min);
-        previous.max = Math.max(previous.max, diffData.max);
+    let _baseDiffPoints: DiffPoint[];
+    let _isOnlySide: null | 'left' | 'right' = null;
+    if (this.selectedHistogramRegion === HistogramRegion.lastRoi) {
+      if (this.selectedSide.isLeft) {
+        _baseDiffPoints = difListLeft.flatMap((p) => p.diffData.array);
+        _isOnlySide = 'left';
+      } else {
+        _baseDiffPoints = difListRight.flatMap((p) => p.diffData.array);
+        _isOnlySide = 'right';
+      }
+    } else {
+      _baseDiffPoints = difListLeft
+        .flatMap((p) => p.diffData.array)
+        .concat(difListRight.flatMap((p) => p.diffData.array));
+    }
 
-        previous.leftSum += stats.mean * stats.count;
-        previous.leftCount += stats.count;
-        previous.leftVarianceSum += stats.variance * stats.count;
-        previous.area += stats.area;
+    const diffPoints = [
+      ..._baseDiffPoints
+        .reduce((m, p) => {
+          m.set(`${p.x}_${p.y}`, p);
+          return m;
+        }, new Map<string, DiffPoint>())
+        .values(),
+    ];
+    this.drawHistogram(diffPoints);
+
+    const stats = diffPoints.reduce(
+      (previous, p) => {
+        previous.sumLeft += p.left;
+        previous.sumRight += p.right;
+        previous.sumDiff += p.diff;
+
+        previous.minLeft = Math.min(previous.minLeft, p.left);
+        previous.maxLeft = Math.max(previous.maxLeft, p.left);
+        previous.minRight = Math.min(previous.minRight, p.right);
+        previous.maxRight = Math.max(previous.maxRight, p.right);
+        previous.minDiff = Math.min(previous.minDiff, p.diff);
+        previous.maxDiff = Math.max(previous.maxDiff, p.diff);
         return previous;
       },
       {
-        count: 0,
-        sum: 0,
-        varianceSum: 0,
-        min: Number.MAX_VALUE,
-        max: Number.MIN_VALUE,
-        leftCount: 0,
-        leftSum: 0,
-        leftVarianceSum: 0,
-        area: 0,
+        sumDiff: 0,
+        sumLeft: 0,
+        sumRight: 0,
+        minLeft: Number.MAX_VALUE,
+        maxLeft: Number.MIN_VALUE,
+        minRight: Number.MAX_VALUE,
+        maxRight: Number.MIN_VALUE,
+        minDiff: Number.MAX_VALUE,
+        maxDiff: Number.MIN_VALUE,
       }
     );
-    const diffMean = stats.sum / stats.count;
+    const diffMean = stats.sumDiff / diffPoints.length;
+    const leftMean = stats.sumLeft / diffPoints.length;
+    const rightMean = stats.sumRight / diffPoints.length;
 
-    const diffVariance =
-      difList
-        .flatMap(({ diffData }) => diffData.array)
-        .reduce((previous, p) => {
-          return previous + Math.pow(p.diff - diffMean, 2);
-        }, 0) / stats.count;
+    const diffVariance = diffPoints.reduce(
+      (previous, p) => {
+        previous.diff += Math.pow(p.diff - diffMean, 2);
+        previous.left += Math.pow(p.left - leftMean, 2);
+        previous.right += Math.pow(p.right - rightMean, 2);
+        return previous;
+      },
+      { left: 0, right: 0, diff: 0 }
+    );
 
-    const statsRight = this.imageDataRight
-      .getData(this.selectedHistogramRegion)
-      .reduce(
+    const _sideStats = (data: ImageData) => {
+      return data.getData(this.selectedHistogramRegion).reduce(
         (previous, { stats }) => {
           previous.sum += stats.mean * stats.count;
           previous.count += stats.count;
@@ -1014,26 +1073,47 @@ export class AppComponent {
           area: 0,
         }
       );
+    };
+    const statsLeft = _sideStats(this.imageDataLeft);
+    const statsRight = _sideStats(this.imageDataRight);
 
-    const toFloatStr = (v: number) => Number.parseFloat(v.toFixed(1));
+    const toStr = (v: number) => Number.parseFloat(v.toFixed(1));
 
-    if (stats.count > 0) {
+    if (diffPoints.length > 0) {
       this.volumeStats = {
         ...stats,
-        mean: toFloatStr(diffMean),
-        std: toFloatStr(Math.sqrt(diffVariance)),
+
+        count: diffPoints.length,
+        max: stats.maxDiff,
+        min: stats.minDiff,
+        sum: stats.sumDiff,
+
         //
-        meanLeft: toFloatStr(stats.leftSum / stats.leftCount),
-        stdLeft: toFloatStr(Math.sqrt(stats.leftVarianceSum / stats.leftCount)),
-        areaLeft: toFloatStr(stats.area),
+        mean: toStr(diffMean),
+        std: toStr(Math.sqrt(diffVariance.diff / diffPoints.length)),
         //
-        meanRight: toFloatStr(statsRight.sum / statsRight.count),
-        stdRight: toFloatStr(
-          Math.sqrt(statsRight.varianceSum / statsRight.count)
-        ),
-        areaRight: toFloatStr(statsRight.area),
+        meanLeft: toStr(leftMean),
+        stdLeft: toStr(Math.sqrt(diffVariance.left / diffPoints.length)),
+        //
+        meanRight: toStr(rightMean),
+        stdRight: toStr(Math.sqrt(diffVariance.right / diffPoints.length)),
+
+        //
+        areaLeft: _isOnlySide === 'right' ? 0 : toStr(statsLeft.area),
+        areaRight: _isOnlySide === 'left' ? 0 : toStr(statsRight.area),
+
+        // //
+        // meanLeft: toStr(statsLeft.sum / statsLeft.count),
+        // stdLeft: toStr(Math.sqrt(statsLeft.varianceSum / statsLeft.count)),
+        // //
+        // meanRight: toStr(statsRight.sum / statsRight.count),
+        // stdRight: toStr(Math.sqrt(statsRight.varianceSum / statsRight.count)),
       };
     }
+  };
+
+  shouldSynchronizeRoi = (): boolean => {
+    return this.imageDataRight.synchronized;
   };
 
   _setUpTools = (element: HTMLDivElement): void => {
@@ -1052,12 +1132,13 @@ export class AppComponent {
       const synchronizerFreehandRoi = new cornerstoneTools.Synchronizer(
         `click`,
         this.cornerstoneService.freehandRoiSynchronizer({
-          onUpdateCompleted: this.drawCompCanvas,
+          onUpdateCompleted: this._onRoiEdited,
           getImageVisibility: (d) =>
             // true
             this.imageDataLeft.getElement() === d
               ? this.imageDataLeft.visible
               : this.imageDataRight.visible,
+          shouldSynchronize: this.shouldSynchronizeRoi,
         })
       );
 
@@ -1074,8 +1155,9 @@ export class AppComponent {
             ) as any).cancelDrawing(el);
             this.cornerstoneService.syncronize(
               {
-                onUpdateCompleted: (_, __) => {},
+                onUpdateCompleted: (_) => {},
                 getImageVisibility: (d) => true,
+                shouldSynchronize: this.shouldSynchronizeRoi,
               },
               el,
               this.otherData(data).getElement()
@@ -1184,3 +1266,32 @@ export class AppComponent {
     }
   };
 }
+
+// const leftMap = difListLeft.reduce((set, value) => {
+//   set.set(value.uuid, value);
+//   return set;
+// }, new Map<string, ImageStackData>());
+// const rightMap = difListRight.reduce((set, value) => {
+//   set.set(value.uuid, value);
+//   const leftValue = leftMap.get(value.uuid);
+//   if (leftValue !== undefined) {
+//     if (roisAreEqual(value.points, leftValue.points)) {
+//       difList.push(value);
+//     } else {
+//       // TODO: diff
+//     }
+//   } else {
+//     difList.push(value);
+//   }
+//   return set;
+// }, new Map<string, ImageStackData>());
+
+// leftMap.forEach((value, key) => {
+//   const rightValue = rightMap.get(value.uuid);
+//   if (rightValue === undefined) {
+//     if (roisAreEqual(value.points, rightValue.points)) {
+//     } else {
+//       // TODO: diff
+//     }
+//   }
+// });

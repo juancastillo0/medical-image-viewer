@@ -36,7 +36,6 @@
       <button (click)="toggleTool(ToolName.FreehandRoi)"
         [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">ROI Tool</button>
     </div>
-    <!-- <button (click)="clearTool()">Clear</button> -->
     <div class="dropdown">
       <button class="dropdown-button" ngPreserveWhitespaces style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
       <div class="dropdown-content">
@@ -45,12 +44,6 @@
         <button (click)="clearTool(HistogramRegion.volume)">Volume</button>
       </div>
     </div>
-    <!-- <select (input)="clearTool(selectClear)" #selectClear (click)="showClearSelection = !showClearSelection">
-      <option *ngIf="showClearSelection" value="null" disabled [selected]="true">Clear</option>
-      <option value={{HistogramRegion.lastRoi}} [selected]="false">Last ROI</option>
-      <option value={{HistogramRegion.stackPosition}} [selected]="false">Stack Position</option>
-      <option value={{HistogramRegion.volume}} [selected]="false">Volume</option>
-    </select> -->
     <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
       {{stackPosition + 1}}/{{stackSize}}
     </div>
@@ -77,6 +70,11 @@
       </div>
       <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
         (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
+    </div>
+    <div class="col">
+      <label for="checkboxRoisSynchronization" class="small-label">Sync</label>
+      <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
+        (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
     </div>
   </div>
   <div class="row" style="justify-content: center;">
@@ -140,14 +138,6 @@
         [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}">
         <div class="row" style="align-items: center;">
           <h2 style="padding: 0 25px 5px 5px;">Comparison</h2>
-          <button (click)="selectHistogram(HistogramType.dist)"
-            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogram === HistogramType.dist}">Distribution</button>
-          <button (click)="selectHistogram(HistogramType.diff)"
-            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogram === HistogramType.diff}">Difference</button>
-        </div>
-        <div class="row" style="align-items: center;">
           <button (click)="selectHistogramRegion(HistogramRegion.volume)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
             [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.volume}">Volume</button>
@@ -157,6 +147,14 @@
           <button (click)="selectHistogramRegion(HistogramRegion.lastRoi)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
             [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.lastRoi}">Last ROI</button>
+        </div>
+        <div class="row" style="align-items: center;">
+          <button (click)="selectHistogram(HistogramType.dist)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogram === HistogramType.dist}">Distribution</button>
+          <button (click)="selectHistogram(HistogramType.diff)"
+            [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
+            [ngClass]="{'pressed': selectedHistogram === HistogramType.diff}">Difference</button>
         </div>
       </div>
       <div class="row" style="justify-content: flex-end;align-items: center;flex: 1;">
@@ -194,7 +192,7 @@
         <div *ngIf="volumeStats === undefined" style="flex: 1;text-align: center;">
           No Comparison Available. Select a region of interest for the comparison.
         </div>
-        <div *ngIf="volumeStats !== undefined" style="padding-left: 5px;">
+        <div *ngIf="volumeStats !== undefined" style="padding-left: 25px;">
           <table>
             <h4>Left</h4>
             <tr>
