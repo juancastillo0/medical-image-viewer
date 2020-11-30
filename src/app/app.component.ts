@@ -428,7 +428,7 @@ export class AppComponent {
     ctx.stroke();
   };
 
-  _onRoiEdited = (data: RoiData, element: HTMLElement) => {
+  _didChangeRoi = (data: RoiData, element: HTMLElement): boolean => {
     let imageData: ImageData;
     if (element.id === this.imageDataLeft.getElement().id) {
       imageData = this.imageDataLeft;
@@ -445,7 +445,22 @@ export class AppComponent {
       !!stackPoints[data.uuid] &&
       roisAreEqual(stackPoints[data.uuid].points, data.handles.points)
     ) {
-      return;
+      return false;
+    }
+    return true;
+  };
+
+  _onRoiEdited = (data: RoiData, element: HTMLElement): boolean => {
+    let imageData: ImageData;
+    if (element.id === this.imageDataLeft.getElement().id) {
+      imageData = this.imageDataLeft;
+    } else {
+      imageData = this.imageDataRight;
+    }
+    data.visible = imageData.visible;
+
+    if (!this._didChangeRoi(data, element)) {
+      return false;
     }
     const _tool = cornerstoneTools.getToolForElement(
       element,
@@ -455,10 +470,12 @@ export class AppComponent {
     (_tool as any).updateCachedStats(_image, element, data);
 
     imageData.lastRoiUuid = data.uuid;
+    const stackIndex = imageData.currentStackIndex();
     imageData.setPoints(stackIndex, data);
     this.selectedSide = imageData;
 
     cornerstone.updateImage(imageData.getElement(), true);
+    return true;
   };
 
   drawHistogram = (points: DiffPoint[]): void => {
@@ -1133,6 +1150,7 @@ export class AppComponent {
         `click`,
         this.cornerstoneService.freehandRoiSynchronizer({
           onUpdateCompleted: this._onRoiEdited,
+          didChangeRoi: this._didChangeRoi,
           getImageVisibility: (d) =>
             // true
             this.imageDataLeft.getElement() === d
@@ -1153,15 +1171,32 @@ export class AppComponent {
               el,
               ToolName.FreehandRoi
             ) as any).cancelDrawing(el);
-            this.cornerstoneService.syncronize(
-              {
-                onUpdateCompleted: (_) => {},
-                getImageVisibility: (d) => true,
-                shouldSynchronize: this.shouldSynchronizeRoi,
-              },
-              el,
-              this.otherData(data).getElement()
-            );
+            const other = this.otherData(data);
+            const otherRois: RoiData[] = cornerstoneTools.getToolState(
+              other.getElement(),
+              ToolName.FreehandRoi
+            )?.data;
+            for (const roi of otherRois) {
+              if (roi.area === undefined) {
+                cornerstoneTools.removeToolState(
+                  other.getElement(),
+                  ToolName.FreehandRoi,
+                  roi
+                );
+              }
+            }
+            cornerstone.updateImage(other.getElement());
+            cornerstone.updateImage(el);
+            // this.cornerstoneService.syncronize(
+            //   {
+            //     onUpdateCompleted: (_) => true,
+            //     getImageVisibility: (d) => true,
+            //     didChangeRoi: () => true,
+            //     shouldSynchronize: this.shouldSynchronizeRoi,
+            //   },
+            //   el,
+            //   this.otherData(data).getElement()
+            // );
           }
         });
       }
