@@ -333,7 +333,6 @@ export class CornerstoneService {
         const visible = callbacks.getImageVisibility(sourceElement);
         for (const dataTarget of targetRois) {
           const didUpdate = callbacks.didChangeRoi(dataTarget, targetElement);
-          const image = cornerstone.getImage(sourceElement);
 
           if (didUpdate) {
             const sourceRoi = sourceRois.find(
@@ -365,7 +364,10 @@ export class CornerstoneService {
             if (newData.canComplete || dataTarget.area > 0.1) {
               callbacks.onUpdateCompleted(newData, sourceElement);
               callbacks.onUpdateCompleted(dataTarget, targetElement);
+            } else {
+              dataTarget.visible = true;
             }
+
             // callbacks.onUpdateCompleted(newData, sourceElement);
             break;
           }
@@ -386,36 +388,36 @@ export class CornerstoneService {
         //   sourceRois.length > targetRois.length ? sourceRois : targetRois;
         // cornerstoneTools.clearToolState(toRemove, ToolName.FreehandRoi);
         // addData(toRemove, data);
-      // } else {
-      //   console.log('same size');
-      //   for (let i = 0; i < targetRois.length; i++) {
-      //     const dataTarget = targetRois[i];
-      //     const dataSource = sourceRois[i];
+        // } else {
+        //   console.log('same size');
+        //   for (let i = 0; i < targetRois.length; i++) {
+        //     const dataTarget = targetRois[i];
+        //     const dataSource = sourceRois[i];
 
-      //     if (dataTarget.area > 0.1 || dataTarget.canComplete) {
-      //       const didUpdate = callbacks.onUpdateCompleted(
-      //         dataTarget,
-      //         targetElement
-      //       );
-      //       if (didUpdate) {
-      //         dataSource.handles.points = dataTarget.handles.points.map(
-      //           (p) => ({
-      //             ...p,
-      //             x: p.x * ratio,
-      //             y: p.y * ratio,
-      //           })
-      //         );
-      //         callbacks.onUpdateCompleted(dataSource, sourceElement);
-      //       }
-      //     } else {
-      //       dataSource.visible = true;
-      //       dataSource.handles.points = dataTarget.handles.points.map((p) => ({
-      //         ...p,
-      //         x: p.x * ratio,
-      //         y: p.y * ratio,
-      //       }));
-      //     }
-      //   }
+        //     if (dataTarget.area > 0.1 || dataTarget.canComplete) {
+        //       const didUpdate = callbacks.onUpdateCompleted(
+        //         dataTarget,
+        //         targetElement
+        //       );
+        //       if (didUpdate) {
+        //         dataSource.handles.points = dataTarget.handles.points.map(
+        //           (p) => ({
+        //             ...p,
+        //             x: p.x * ratio,
+        //             y: p.y * ratio,
+        //           })
+        //         );
+        //         callbacks.onUpdateCompleted(dataSource, sourceElement);
+        //       }
+        //     } else {
+        //       dataSource.visible = true;
+        //       dataSource.handles.points = dataTarget.handles.points.map((p) => ({
+        //         ...p,
+        //         x: p.x * ratio,
+        //         y: p.y * ratio,
+        //       }));
+        //     }
+        //   }
       }
       // TODO: verify for images with different sizes
       (cornerstoneTools.getToolForElement(

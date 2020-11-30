@@ -103,7 +103,6 @@ class ImageData {
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
   imageId?: string;
-  lastRoiUuid?: string;
 
   dynamicImage?: CornerstoneImage;
   overlayLayerId?: string;
@@ -174,11 +173,11 @@ class ImageData {
     });
   };
 
-  getData = (histogramRegion: HistogramRegion) => {
+  getData = (histogramRegion: HistogramRegion, lastRoiUuid: string) => {
     let filter: (d: ImageStackData) => boolean;
     switch (histogramRegion) {
       case HistogramRegion.lastRoi:
-        filter = (d) => d.uuid === this.lastRoiUuid;
+        filter = (d) => d.uuid === lastRoiUuid;
         break;
       case HistogramRegion.stackPosition:
         const curr = this.currentStackPoints();
@@ -194,17 +193,20 @@ class ImageData {
       .filter((v) => v.diffData !== undefined && filter(v));
   };
 
-  removeData = (histogramRegion: HistogramRegion): boolean => {
+  removeData = (
+    histogramRegion: HistogramRegion,
+    lastRoiUuid: string
+  ): boolean => {
     if (!this.loaded) {
       return false;
     }
     let didChange = false;
     switch (histogramRegion) {
       case HistogramRegion.lastRoi:
-        if (this.lastRoiUuid !== undefined) {
+        if (lastRoiUuid !== undefined) {
           for (const arr of this.roiPointsByStack) {
-            if (arr !== undefined && arr[this.lastRoiUuid] !== undefined) {
-              delete arr[this.lastRoiUuid];
+            if (arr !== undefined && arr[lastRoiUuid] !== undefined) {
+              delete arr[lastRoiUuid];
               didChange = true;
             }
           }
@@ -270,6 +272,7 @@ export class AppComponent {
   selectedColormap = CornerstoneColormap.hotIron;
   stackSize: number;
   stackPosition: number;
+  lastRoiUuid?: string;
   importedImageIds: Map<string, Array<string>> = new Map();
   volumeStats?: {
     count: number;
@@ -469,7 +472,7 @@ export class AppComponent {
     const _image = cornerstone.getImage(element);
     (_tool as any).updateCachedStats(_image, element, data);
 
-    imageData.lastRoiUuid = data.uuid;
+    this.lastRoiUuid = data.uuid;
     const stackIndex = imageData.currentStackIndex();
     imageData.setPoints(stackIndex, data);
     this.selectedSide = imageData;
@@ -600,7 +603,7 @@ export class AppComponent {
 
   clearTool = (histogramRegion: HistogramRegion): void => {
     for (const data of [this.imageDataLeft, this.imageDataRight]) {
-      if (data.removeData(histogramRegion)) {
+      if (data.removeData(histogramRegion, this.lastRoiUuid)) {
         this.synchronizeRoiPoints(data);
       }
     }
@@ -1007,10 +1010,12 @@ export class AppComponent {
 
   updateVolumeStats = () => {
     const difListLeft = this.imageDataLeft.getData(
-      this.selectedHistogramRegion
+      this.selectedHistogramRegion,
+      this.lastRoiUuid
     );
     const difListRight = this.imageDataRight.getData(
-      this.selectedHistogramRegion
+      this.selectedHistogramRegion,
+      this.lastRoiUuid
     );
     if (difListLeft.length === 0 && difListRight.length === 0) {
       return;
@@ -1083,21 +1088,23 @@ export class AppComponent {
     );
 
     const _sideStats = (data: ImageData) => {
-      return data.getData(this.selectedHistogramRegion).reduce(
-        (previous, { stats }) => {
-          previous.sum += stats.mean * stats.count;
-          previous.count += stats.count;
-          previous.varianceSum += stats.variance * stats.count;
-          previous.area += stats.area;
-          return previous;
-        },
-        {
-          count: 0,
-          sum: 0,
-          varianceSum: 0,
-          area: 0,
-        }
-      );
+      return data
+        .getData(this.selectedHistogramRegion, this.lastRoiUuid)
+        .reduce(
+          (previous, { stats }) => {
+            previous.sum += stats.mean * stats.count;
+            previous.count += stats.count;
+            previous.varianceSum += stats.variance * stats.count;
+            previous.area += stats.area;
+            return previous;
+          },
+          {
+            count: 0,
+            sum: 0,
+            varianceSum: 0,
+            area: 0,
+          }
+        );
     };
     const statsLeft = _sideStats(this.imageDataLeft);
     const statsRight = _sideStats(this.imageDataRight);
@@ -1124,8 +1131,14 @@ export class AppComponent {
         stdRight: toStr(Math.sqrt(diffVariance.right / diffPoints.length)),
 
         //
-        areaLeft: _isOnlySide === 'right' ? 0 : toStr(statsLeft.area),
-        areaRight: _isOnlySide === 'left' ? 0 : toStr(statsRight.area),
+        areaLeft:
+          _isOnlySide === 'right'
+            ? toStr(statsRight.area)
+            : toStr(statsLeft.area),
+        areaRight:
+          _isOnlySide === 'left'
+            ? toStr(statsLeft.area)
+            : toStr(statsRight.area),
 
         // //
         // meanLeft: toStr(statsLeft.sum / statsLeft.count),
