@@ -848,7 +848,6 @@ export class AppComponent {
     const cornerstonData = state.data as RoiData[];
     if (cornerstonData.length > Object.keys(stackPointCurr).length) {
       cornerstoneTools.clearToolState(elem, ToolName.FreehandRoi);
-      return true;
     }
     const map = cornerstonData.reduce((previous, current) => {
       previous.set(current.uuid, current);
@@ -876,7 +875,16 @@ export class AppComponent {
       }
     });
     if (result) {
-      data.getElement().click();
+      const element = data.getElement();
+      const _tool = cornerstoneTools.getToolForElement(
+        element,
+        ToolName.FreehandRoi
+      );
+      const _image = cornerstone.getImage(element);
+      for (const d of cornerstoneTools.getToolState(elem, ToolName.FreehandRoi)
+        ?.data ?? []) {
+        (_tool as any).updateCachedStats(_image, element, d);
+      }
     }
     return result;
   };
