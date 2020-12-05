@@ -44,7 +44,6 @@ const resizeImage = (
   return imageTensor;
 };
 
-
 type ImageBufferType = 'uint16' | 'uint32' | 'uint8';
 type ImageBuffer = Uint8Array | Uint16Array | Uint32Array;
 type ImageBufferConstructor =
@@ -157,8 +156,9 @@ class ImageData {
   loading = false;
   loaded = false;
   visible = true;
-  synchronized = true;
   opacity = 0.7;
+  stackPosition?: number;
+  stackSize?: number;
   parsingResult?: ParsingResult = undefined;
   getElement: () => HTMLDivElement;
   imageId?: string;
@@ -329,8 +329,6 @@ export class AppComponent {
   readonly defaultTool = ToolName.Pan;
   enabledTool = ToolName.Pan;
   selectedColormap = CornerstoneColormap.hotIron;
-  stackSize: number;
-  stackPosition: number;
   lastRoiUuid?: string;
   importedImageIds: Map<string, Array<string>> = new Map();
   volumeStats?: {
@@ -360,6 +358,9 @@ export class AppComponent {
     { isLeft: false }
   );
   selectedSide: ImageData;
+
+  synchronizeRoi = true;
+  synchronizeStack = true;
 
   get allLoaded(): boolean {
     (window as any).dataL = this.imageDataLeft;
@@ -441,8 +442,12 @@ export class AppComponent {
     cornerstone.updateImage(imageData.getElement());
   };
 
-  updateRoiSynchronization = (imageData: ImageData) => {
-    imageData.synchronized = !imageData.synchronized;
+  updateRoiSynchronization = () => {
+    this.synchronizeRoi = !this.synchronizeRoi;
+  };
+
+  updateStackSynchronization = () => {
+    this.synchronizeStack = !this.synchronizeStack;
   };
 
   _drawRoiInCanvas = (targetPixels: Array<number>, targetBBox: BBox) => {
@@ -785,8 +790,8 @@ export class AppComponent {
       stack.currentImageIdIndex = this.otherData(data).currentStackIndex();
     }
     cornerstoneTools.addToolState(element, 'stack', stack);
-    this.stackPosition = stack.currentImageIdIndex;
-    this.stackSize = stack.imageIds.length;
+    data.stackPosition = stack.currentImageIdIndex;
+    data.stackSize = stack.imageIds.length;
     data.layerId = cornerstone.addLayer(element, firstImage, { opacity: 1 });
 
     // const _imageId = (firstImage.imageId.startsWith('nifti')
@@ -858,35 +863,37 @@ export class AppComponent {
           newImageIdIndex: number;
           direction: 1 | -1;
         };
-        this.stackPosition = eDetail.newImageIdIndex;
+        data.stackPosition = eDetail.newImageIdIndex;
 
-        if ([this.imageDataLeft, this.imageDataRight].every((d) => d.loaded)) {
-          let retries = 0;
-          while (
-            retries < 5 &&
-            this.imageDataLeft.currentStackIndex() !==
-              this.imageDataRight.currentStackIndex()
+        if (this.synchronizeStack) {
+          this.otherData(data).stackPosition = eDetail.newImageIdIndex;
+          if (
+            [this.imageDataLeft, this.imageDataRight].every((d) => d.loaded)
           ) {
-            await new Promise((resolve) => setTimeout(resolve, 20));
-            retries++;
+            let retries = 0;
+            while (
+              retries < 5 &&
+              this.imageDataLeft.currentStackIndex() !==
+                this.imageDataRight.currentStackIndex()
+            ) {
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              retries++;
+            }
           }
-        }
 
-        for (const d of [this.imageDataLeft, this.imageDataRight]) {
-          if (!d.loaded || eDetail.newImageIdIndex !== d.currentStackIndex()) {
-            return;
+          for (const d of [this.imageDataLeft, this.imageDataRight]) {
+            if (
+              !d.loaded ||
+              eDetail.newImageIdIndex !== d.currentStackIndex()
+            ) {
+              return;
+            }
+            this.synchronizeRoiPoints(d);
+            cornerstone.updateImage(d.getElement(), true);
           }
-          const stackPointCurr = d.currentStackPoints(eDetail.newImageIdIndex);
-          const elem = d.getElement();
-          const shouldUpdate = this.synchronizeRoiPoints(d);
-          cornerstone.updateImage(elem, true);
-          // if (
-          //   shouldUpdate ||
-          //   !!stackPointCurr ||
-          //   !!d.currentStackPoints(eDetail.newImageIdIndex - eDetail.direction)
-          // ) {
-          //   cornerstone.updateImage(elem, true);
-          // }
+        } else {
+          this.synchronizeRoiPoints(data);
+          cornerstone.updateImage(data.getElement(), true);
         }
       }
     );
@@ -1215,10 +1222,6 @@ export class AppComponent {
     }
   };
 
-  shouldSynchronizeRoi = (): boolean => {
-    return this.imageDataRight.synchronized;
-  };
-
   _setUpTools = (element: HTMLDivElement): void => {
     cornerstone.enable(element);
 
@@ -1229,7 +1232,16 @@ export class AppComponent {
       );
       const synchronizerStack = new cornerstoneTools.Synchronizer(
         cornerstone.EVENTS.IMAGE_RENDERED,
-        cornerstoneTools.stackImageIndexSynchronizer
+        (_synchronizer, target, source, eventData) => {
+          if (this.synchronizeStack) {
+            return cornerstoneTools.stackImageIndexSynchronizer(
+              _synchronizer,
+              target,
+              source,
+              eventData
+            );
+          }
+        }
       );
 
       const synchronizerFreehandRoi = new cornerstoneTools.Synchronizer(
@@ -1242,7 +1254,7 @@ export class AppComponent {
             this.imageDataLeft.getElement() === d
               ? this.imageDataLeft.visible
               : this.imageDataRight.visible,
-          shouldSynchronize: this.shouldSynchronizeRoi,
+          shouldSynchronize: () => this.synchronizeRoi,
         })
       );
 

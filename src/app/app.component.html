@@ -49,20 +49,17 @@
         </div>
         <div class="col" style="align-items: center;">
           <label for="checkboxRoisSynchronization" class="small-label">Sync Rois</label>
-          <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
-            (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
+          <input type="checkbox" id="checkboxRoiSynchronization" [checked]="synchronizeRoi"
+            (change)="updateRoiSynchronization()" #checkboxRoiSynchronization>
         </div>
       </div>
 
       <!-- STACK -->
       <div class="row" style="justify-content: space-between;padding: 10px 0;">
-        <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
-          {{stackPosition + 1}}/{{stackSize}}
-        </div>
         <div class="col" style="justify-content: space-between; align-items: center;">
-          <label for="checkboxRoisSynchronization" class="small-label">Sync Stack</label>
-          <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
-            (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
+          <label for="checkboxStackSynchronization" class="small-label">Sync Stack</label>
+          <input type="checkbox" id="checkboxStackSynchronization" [checked]="synchronizeStack"
+            (change)="updateStackSynchronization()" #checkboxStackSynchronization>
         </div>
         <button>
           Register
@@ -72,15 +69,20 @@
       <!-- LEFT -->
       <div class="col">
         <h4>Left</h4>
-        <fieldset *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" class="select-fieldset">
-          <label class="small-label" for="selectImageLeft">Image import</label>
-          <select name="select-image" id="selectImageLeft" (input)="changeImage(selectImageLeft, imageDataLeft)"
-            #selectImageLeft>
-            <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-              [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
-            <option value="IMPORT" [selected]="false">Import Image</option>
-          </select>
-        </fieldset>
+        <div class="row" style="justify-content: space-between;">
+          <fieldset *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" class="select-fieldset">
+            <label class="small-label" for="selectImageLeft">Image import</label>
+            <select name="select-image" id="selectImageLeft" (input)="changeImage(selectImageLeft, imageDataLeft)"
+              #selectImageLeft>
+              <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+                [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
+              <option value="IMPORT" [selected]="false">Import Image</option>
+            </select>
+          </fieldset>
+          <div *ngIf="imageDataLeft.loaded && imageDataLeft.stackSize !== 1" style="align-self: center;">
+            {{imageDataLeft.stackPosition + 1}}/{{imageDataLeft.stackSize}}
+          </div>
+        </div>
         <div class="col">
           <div class="row" style="justify-content: space-between;">
             <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
@@ -94,15 +96,20 @@
       <!-- RIGHT -->
       <div class="col">
         <h4>Right</h4>
-        <fieldset *ngIf="imageDataRight.loaded || importedImageIds.size > 1" class="select-fieldset">
-          <label class="small-label" for="selectImageRight">Image import</label>
-          <select name="select-image" id="selectImageRight" (input)="changeImage(selectImageRight, imageDataRight)"
-            #selectImageRight>
-            <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-              [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
-            <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
-          </select>
-        </fieldset>
+        <div class="row" style="justify-content: space-between;">
+          <fieldset *ngIf="imageDataRight.loaded || importedImageIds.size > 1" class="select-fieldset">
+            <label class="small-label" for="selectImageRight">Image import</label>
+            <select name="select-image" id="selectImageRight" (input)="changeImage(selectImageRight, imageDataRight)"
+              #selectImageRight>
+              <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+                [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
+              <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
+            </select>
+          </fieldset>
+          <div *ngIf="imageDataRight.loaded && imageDataRight.stackSize !== 1" style="align-self: center;">
+            {{imageDataRight.stackPosition + 1}}/{{imageDataRight.stackSize}}
+          </div>
+        </div>
         <div class="col">
           <div class="row" style="justify-content: space-between;">
             <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
