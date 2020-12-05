@@ -5,6 +5,7 @@ import * as _cornerstone from 'cornerstone-core';
 import * as _cornerstoneTools from 'cornerstone-tools';
 import * as _cornerstoneMath from 'cornerstone-math';
 import * as _cornerstoneNIFTIImageLoader from '@cornerstonejs/nifti-image-loader';
+import * as _cornerstoneWebImageLoader from 'cornerstone-web-image-loader';
 import Hammer from 'hammerjs';
 import {
   CornerstoneModule,
@@ -20,6 +21,7 @@ export const cornerstone: CornerstoneModule = _cornerstone;
 export const cornerstoneWADOImageLoader: any = _cornerstoneWADOImageLoader;
 export const cornerstoneNIFTIImageLoader: any = _cornerstoneNIFTIImageLoader;
 export const cornerstoneMath: any = _cornerstoneMath;
+export const cornerstoneWebImageLoader: any = _cornerstoneWebImageLoader;
 
 export enum ToolName {
   Pan = 'Pan',
@@ -165,6 +167,7 @@ export class CornerstoneService {
 
     cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
     cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+    cornerstoneWebImageLoader.external.cornerstone = cornerstone;
 
     console.log(cornerstoneTools);
     console.log(cornerstone);
@@ -174,6 +177,9 @@ export class CornerstoneService {
     (window as any).cornerstoneMath = cornerstoneMath;
     (window as any).cornerstoneNIFTIImageLoader = cornerstoneNIFTIImageLoader;
     (window as any).cornerstoneWADOImageLoader = cornerstoneWADOImageLoader;
+    (window as any).cornerstoneWebImageLoader = cornerstoneWebImageLoader;
+
+    (window as any).imageRegistration = this.imageRegistration;
 
     function getBlobUrl(url: string): string {
       const baseUrl = window.URL || window.webkitURL;
@@ -201,6 +207,8 @@ export class CornerstoneService {
     };
 
     cornerstoneWADOImageLoader.webWorkerManager.initialize(config);
+    // cornerstone.registerImageLoader('blob', cornerstoneWebImageLoader);
+    cornerstoneWebImageLoader.configure({ beforeSend: () => {} });
   }
 
   panZoomSynchronizer: SynchronizerCallback = (
