@@ -481,6 +481,44 @@ export class CornerstoneService {
       polyBoundingBox: getBoundingBox(points),
     };
   };
+
+  imageRegistration = async (
+    elemLeft: HTMLDivElement,
+    elemRight: HTMLDivElement
+  ) => {
+    const toBlob = (canvas: HTMLCanvasElement) => {
+      return new Promise<Blob | null>((r) => {
+        canvas.toBlob(r);
+      });
+    };
+    const blobs = await Promise.all([
+      toBlob(elemLeft.querySelector('canvas')),
+      toBlob(elemRight.querySelector('canvas')),
+    ]);
+    const formData = new FormData();
+    formData.append('cut1', blobs[0]);
+    formData.append('cut2', blobs[1]);
+
+    const response = await fetch('http://127.0.0.1:5000/files/registration', {
+      method: 'POST',
+      body: formData,
+    });
+
+    let image: string;
+    if (response.ok) {
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      image = await cornerstoneWebImageLoader.loadImage(blobUrl).promise;
+      console.log(image);
+    }
+    return { response, image };
+  };
+
+  rotateViewport = () => {
+    // const viewport = cornerstone.getViewport(element);
+    // viewport.rotation -= 5;
+    // cornerstone.setViewport(element, viewport);
+  };
 }
 
 // let _x = Math.round(bbox.left);

@@ -11,73 +11,109 @@
 
 
 <div class="col">
-  <div class="row" id="top-menu">
-    <fieldset *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" class="select-fieldset">
-      <label class="small-label" for="selectImageLeft">Image import</label>
-      <select name="select-image" id="selectImageLeft" (input)="changeImage(selectImageLeft, imageDataLeft)"
-        #selectImageLeft>
-        <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-          [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
-        <option value="IMPORT" [selected]="false">Import Image</option>
-      </select>
-    </fieldset>
-    <div class="col">
-      <div class="row" style="justify-content: space-between;">
-        <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
-        <input type="checkbox" id="layerVisibilityLeft" [checked]="imageDataLeft.visible"
-          (change)="updateLayerVisibility(imageDataLeft)" #layerVisibilityLeft>
-      </div>
-      <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
-        (change)="updateLayerOpacity(layerOpacityLeft.value, imageDataLeft)" #layerOpacityLeft>
-    </div>
-    <div class="row">
-      <button (click)="toggleTool(ToolName.Probe)" [ngClass]="{'pressed': enabledTool === ToolName.Probe}">Probe
-        Tool</button>
-      <button (click)="toggleTool(ToolName.FreehandRoi)"
-        [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">ROI Tool</button>
-    </div>
-    <div class="dropdown">
-      <button class="dropdown-button" ngPreserveWhitespaces style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
-      <div class="dropdown-content">
-        <button (click)="clearTool(HistogramRegion.lastRoi)">Last ROI</button>
-        <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
-        <button (click)="clearTool(HistogramRegion.volume)">Volume</button>
-      </div>
-    </div>
-    <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
-      {{stackPosition + 1}}/{{stackSize}}
-    </div>
-    <div class="col">
-      <label for="selectColormap" class="small-label">Colormap</label>
-      <select name="colormap" id="selectColormap" (change)="changeColormap(selectColormap.value)" #selectColormap>
-        <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}</option>
-      </select>
-    </div>
-    <fieldset *ngIf="imageDataRight.loaded || importedImageIds.size > 1" class="select-fieldset">
-      <label class="small-label" for="selectImageRight">Image import</label>
-      <select name="select-image" id="selectImageRight" (input)="changeImage(selectImageRight, imageDataRight)"
-        #selectImageRight>
-        <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
-          [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
-        <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
-      </select>
-    </fieldset>
-    <div class="col">
-      <div class="row" style="justify-content: space-between;">
-        <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
-        <input type="checkbox" id="layerVisibilityRight" [checked]="imageDataRight.visible"
-          (change)="updateLayerVisibility(imageDataRight)" #layerVisibilityRight>
-      </div>
-      <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
-        (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
-    </div>
-    <div class="col">
-      <label for="checkboxRoisSynchronization" class="small-label">Sync</label>
-      <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
-        (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
-    </div>
-  </div>
   <div class="row" style="justify-content: center;">
+    <div class="col" style="width:200px;padding-right: 15px;">
+      <h4>Config</h4>
+
+      <!-- TOOLS -->
+      <div class="col" style="align-items: center;">
+        <div class="row">
+          <button (click)="toggleTool(ToolName.Probe)" [ngClass]="{'pressed': enabledTool === ToolName.Probe}">
+            Probe Tool
+          </button>
+          <button (click)="toggleTool(ToolName.FreehandRoi)"
+            [ngClass]="{'pressed': enabledTool === ToolName.FreehandRoi}">
+            ROI Tool
+          </button>
+        </div>
+      </div>
+      <div style="align-self: center;padding: 5px 0;">
+        <div class="dropdown">
+          <button class="dropdown-button" ngPreserveWhitespaces
+            style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
+          <div class="dropdown-content">
+            <button (click)="clearTool(HistogramRegion.lastRoi)">Last ROI</button>
+            <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
+            <button (click)="clearTool(HistogramRegion.volume)">Volume</button>
+          </div>
+        </div>
+      </div>
+      <!-- GLOBAL ROI -->
+      <div class="row" style="justify-content: space-between;">
+        <div class="col">
+          <label for="selectColormap" class="small-label">Roi Colormap</label>
+          <select name="colormap" id="selectColormap" (change)="changeColormap(selectColormap.value)" #selectColormap>
+            <option *ngFor="let v of colormaps" value={{v.id}} [selected]="v.id === selectedColormap">{{v.name}}
+            </option>
+          </select>
+        </div>
+        <div class="col" style="align-items: center;">
+          <label for="checkboxRoisSynchronization" class="small-label">Sync Rois</label>
+          <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
+            (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
+        </div>
+      </div>
+
+      <!-- STACK -->
+      <div class="row" style="justify-content: space-between;padding: 10px 0;">
+        <div *ngIf="imageDataLeft.loaded || imageDataRight.loaded" style="align-self: center;">
+          {{stackPosition + 1}}/{{stackSize}}
+        </div>
+        <div class="col" style="justify-content: space-between; align-items: center;">
+          <label for="checkboxRoisSynchronization" class="small-label">Sync Stack</label>
+          <input type="checkbox" id="checkboxRoisSynchronization" [checked]="imageDataRight.synchronized"
+            (change)="updateRoiSynchronization(imageDataRight)" #checkboxRoisSynchronization>
+        </div>
+        <button>
+          Register
+        </button>
+      </div>
+
+      <!-- LEFT -->
+      <div class="col">
+        <h4>Left</h4>
+        <fieldset *ngIf="imageDataLeft.loaded || importedImageIds.size > 1" class="select-fieldset">
+          <label class="small-label" for="selectImageLeft">Image import</label>
+          <select name="select-image" id="selectImageLeft" (input)="changeImage(selectImageLeft, imageDataLeft)"
+            #selectImageLeft>
+            <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+              [selected]="imageDataLeft.imageId === v.key">{{v.key}}</option>
+            <option value="IMPORT" [selected]="false">Import Image</option>
+          </select>
+        </fieldset>
+        <div class="col">
+          <div class="row" style="justify-content: space-between;">
+            <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
+            <input type="checkbox" id="layerVisibilityLeft" [checked]="imageDataLeft.visible"
+              (change)="updateLayerVisibility(imageDataLeft)" #layerVisibilityLeft>
+          </div>
+          <input id="layerOpacityLeft" type="range" min="0" max="1" step="0.05" value={{imageDataLeft.opacity}}
+            (change)="updateLayerOpacity(layerOpacityLeft.value, imageDataLeft)" #layerOpacityLeft>
+        </div>
+      </div>
+      <!-- RIGHT -->
+      <div class="col">
+        <h4>Right</h4>
+        <fieldset *ngIf="imageDataRight.loaded || importedImageIds.size > 1" class="select-fieldset">
+          <label class="small-label" for="selectImageRight">Image import</label>
+          <select name="select-image" id="selectImageRight" (input)="changeImage(selectImageRight, imageDataRight)"
+            #selectImageRight>
+            <option *ngFor="let v of importedImageIds | keyvalue" value={{v.key}}
+              [selected]="imageDataRight.imageId === v.key">{{v.key}}</option>
+            <option value="IMPORT" [selected]="!imageDataRight.loaded">Import Image</option>
+          </select>
+        </fieldset>
+        <div class="col">
+          <div class="row" style="justify-content: space-between;">
+            <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
+            <input type="checkbox" id="layerVisibilityRight" [checked]="imageDataRight.visible"
+              (change)="updateLayerVisibility(imageDataRight)" #layerVisibilityRight>
+          </div>
+          <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
+            (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
+        </div>
+      </div>
+    </div>
     <div oncontextmenu='return false;' class="disable-selection noIbar image-wrapper" unselectable='on'
       onselectstart='return false;' onmousedown='return false;'>
       <div id="dicomImageLeft" class="image-inner" #dicomImageLeft tabindex="0">
@@ -187,34 +223,34 @@
       </div>
     </div>
     <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;overflow: auto;">
-      <div class="row" style="justify-content: space-between;align-items: center;height: 100%;">
+      <div class="row" style="justify-content: space-around;align-items: center;height: 100%;">
         <!-- <canvas id="canvasComp" #canvasComp></canvas> -->
         <div *ngIf="volumeStats === undefined" style="flex: 1;text-align: center;">
           No Comparison Available. Select a region of interest for the comparison.
         </div>
         <div *ngIf="volumeStats !== undefined" style="padding-left: 25px;">
           <table>
-            <h4>Left</h4>
+            <h4>Left (union)</h4>
             <tr>
               <td>Mean</td>
-              <td>{{volumeStats.meanLeft}}</td>
+              <td>{{volumeStats.meanLeftOwn}} ({{volumeStats.meanLeft}})</td>
             </tr>
             <tr>
               <td>Std.</td>
-              <td>{{volumeStats.stdLeft}}</td>
+              <td>{{volumeStats.stdLeftOwn}} ({{volumeStats.stdLeft}})</td>
             </tr>
             <tr>
               <td>Area</td>
               <td>{{volumeStats.areaLeft}} mm²</td>
             </tr>
-            <h4>Right</h4>
+            <h4>Right (union)</h4>
             <tr>
               <td>Mean</td>
-              <td>{{volumeStats.meanRight}}</td>
+              <td>{{volumeStats.meanRightOwn}} ({{volumeStats.meanRight}})</td>
             </tr>
             <tr>
               <td>Std.</td>
-              <td>{{volumeStats.stdRight}}</td>
+              <td>{{volumeStats.stdRightOwn}} ({{volumeStats.stdRight}})</td>
             </tr>
             <tr>
               <td>Area</td>

@@ -287,6 +287,10 @@ export class AppComponent {
     stdRight: number;
     areaLeft: number;
     areaRight: number;
+    meanLeftOwn: number;
+    meanRightOwn: number;
+    stdLeftOwn: number;
+    stdRightOwn: number;
   };
 
   imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement, {
@@ -1140,12 +1144,14 @@ export class AppComponent {
             ? toStr(statsLeft.area)
             : toStr(statsRight.area),
 
-        // //
-        // meanLeft: toStr(statsLeft.sum / statsLeft.count),
-        // stdLeft: toStr(Math.sqrt(statsLeft.varianceSum / statsLeft.count)),
-        // //
-        // meanRight: toStr(statsRight.sum / statsRight.count),
-        // stdRight: toStr(Math.sqrt(statsRight.varianceSum / statsRight.count)),
+        //
+        meanLeftOwn: toStr(statsLeft.sum / statsLeft.count),
+        stdLeftOwn: toStr(Math.sqrt(statsLeft.varianceSum / statsLeft.count)),
+        //
+        meanRightOwn: toStr(statsRight.sum / statsRight.count),
+        stdRightOwn: toStr(
+          Math.sqrt(statsRight.varianceSum / statsRight.count)
+        ),
       };
     }
   };
