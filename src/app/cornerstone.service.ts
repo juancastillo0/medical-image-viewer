@@ -225,6 +225,14 @@ export class CornerstoneService {
     const sourceViewport = cornerstone.getViewport(sourceElement);
     const targetViewport = cornerstone.getViewport(targetElement);
 
+    // const columnSpacing = Math.min(targetViewport.displayedArea.columnPixelSpacing, sourceViewport.displayedArea.columnPixelSpacing)
+    // const rowSpacing = Math.min(targetViewport.displayedArea.rowPixelSpacing, sourceViewport.displayedArea.rowPixelSpacing)
+
+    // targetViewport.displayedArea.rowPixelSpacing = rowSpacing
+    // targetViewport.displayedArea.rowPixelSpacing = rowSpacing
+    // targetViewport.displayedArea.columnPixelSpacing = columnSpacing
+    // targetViewport.displayedArea.columnPixelSpacing = columnSpacing
+
     const ratio =
       targetViewport.displayedArea.columnPixelSpacing /
       sourceViewport.displayedArea.columnPixelSpacing;
