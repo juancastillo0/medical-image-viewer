@@ -984,7 +984,7 @@ export class AppComponent {
         .columnPixelSpacing;
       const otherPixelSpacing = cornerstone.getImage(otherData.getElement())
         .columnPixelSpacing;
-      const ratio = otherPixelSpacing / pixelSpacing;
+      const ratio = pixelSpacing / otherPixelSpacing;
 
       for (let i = 0; i < dataList.length; i++) {
         const roi = dataList[i];
