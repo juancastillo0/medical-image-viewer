@@ -47,23 +47,24 @@
             </option>
           </select>
         </div>
-        <div class="col" style="align-items: center;">
+        <div class="col" style="align-items: center;padding-right: 3px;">
           <label for="checkboxRoisSynchronization" class="small-label">Sync Rois</label>
-          <input type="checkbox" id="checkboxRoiSynchronization" [checked]="synchronizeRoi"
-            (change)="updateRoiSynchronization()" #checkboxRoiSynchronization>
+          <input type="checkbox" id="checkboxRoiSynchronization" [disabled]="!synchronizeStack"
+            [checked]="synchronizeRoi && synchronizeStack" (change)="updateRoiSynchronization()"
+            #checkboxRoiSynchronization>
         </div>
       </div>
 
       <!-- STACK -->
       <div class="row" style="justify-content: space-between;padding: 10px 0;">
+        <button>
+          Register
+        </button>
         <div class="col" style="justify-content: space-between; align-items: center;">
           <label for="checkboxStackSynchronization" class="small-label">Sync Stack</label>
           <input type="checkbox" id="checkboxStackSynchronization" [checked]="synchronizeStack"
             (change)="updateStackSynchronization()" #checkboxStackSynchronization>
         </div>
-        <button>
-          Register
-        </button>
       </div>
 
       <!-- LEFT -->
@@ -84,7 +85,7 @@
           </div>
         </div>
         <div class="col">
-          <div class="row" style="justify-content: space-between;">
+          <div class="row" style="justify-content: space-between;align-items: flex-end;">
             <label for="layerOpacityLeft" class="small-label">Opacity: {{imageDataLeft.opacity}}</label>
             <input type="checkbox" id="layerVisibilityLeft" [checked]="imageDataLeft.visible"
               (change)="updateLayerVisibility(imageDataLeft)" #layerVisibilityLeft>
@@ -111,7 +112,7 @@
           </div>
         </div>
         <div class="col">
-          <div class="row" style="justify-content: space-between;">
+          <div class="row" style="justify-content: space-between;align-items: flex-end;">
             <label for="layerOpacityRight" class="small-label">Opacity: {{imageDataRight.opacity}}</label>
             <input type="checkbox" id="layerVisibilityRight" [checked]="imageDataRight.visible"
               (change)="updateLayerVisibility(imageDataRight)" #layerVisibilityRight>
