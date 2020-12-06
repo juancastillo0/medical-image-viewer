@@ -892,6 +892,7 @@ export class AppComponent {
             cornerstone.updateImage(d.getElement(), true);
           }
         } else {
+          await new Promise((resolve) => setTimeout(resolve, 20));
           this.synchronizeRoiPoints(data);
           cornerstone.updateImage(data.getElement(), true);
         }
@@ -1254,7 +1255,7 @@ export class AppComponent {
             this.imageDataLeft.getElement() === d
               ? this.imageDataLeft.visible
               : this.imageDataRight.visible,
-          shouldSynchronize: () => this.synchronizeRoi,
+          shouldSynchronize: () => this.synchronizeRoi && this.synchronizeStack,
         })
       );
 
