@@ -527,6 +527,82 @@ export class CornerstoneService {
     // viewport.rotation -= 5;
     // cornerstone.setViewport(element, viewport);
   };
+
+  stackImageIndexSynchronizer: SynchronizerCallback = (
+    synchronizer,
+    sourceElem,
+    targetElem,
+    delta: number
+  ): void => {
+    // Ignore the case where the source and target are the same enabled element
+    if (targetElem === sourceElem) {
+      return;
+    }
+    const sourceStackToolDataSource = cornerstoneTools.getToolState(
+      sourceElem,
+      'stack'
+    );
+    const sourceStackData = sourceStackToolDataSource.data[0];
+    const targetStackToolDataSource = cornerstoneTools.getToolState(
+      targetElem,
+      'stack'
+    );
+    const targetStackData = targetStackToolDataSource.data[0];
+
+    let newImageIdIndex = sourceStackData.currentImageIdIndex - delta;
+    console.log(delta, newImageIdIndex);
+    // Clamp the index
+    newImageIdIndex = Math.min(
+      Math.max(newImageIdIndex, 0),
+      targetStackData.imageIds.length - 1
+    );
+
+    // Do nothing if the index has not changed
+    if (newImageIdIndex === targetStackData.currentImageIdIndex) {
+      return;
+    }
+    const loadHandlerManager = cornerstoneTools.loadHandlerManager;
+    const startLoadingHandler = loadHandlerManager.getStartLoadHandler(
+      targetElem
+    );
+    const endLoadingHandler = loadHandlerManager.getEndLoadHandler(targetElem);
+    const errorLoadingHandler = loadHandlerManager.getErrorLoadingHandler(
+      targetElem
+    );
+
+    if (startLoadingHandler) {
+      startLoadingHandler(targetElem);
+    }
+
+    let loader;
+
+    if (targetStackData.preventCache === true) {
+      loader = cornerstone.loadImage(targetStackData.imageIds[newImageIdIndex]);
+    } else {
+      loader = cornerstone.loadAndCacheImage(
+        targetStackData.imageIds[newImageIdIndex]
+      );
+    }
+
+    loader.then(
+      (image) => {
+        const viewport = cornerstone.getViewport(targetElem);
+
+        targetStackData.currentImageIdIndex = newImageIdIndex;
+        synchronizer.displayImage(targetElem, image, viewport);
+        if (endLoadingHandler) {
+          endLoadingHandler(targetElem, image);
+        }
+      },
+      (error) => {
+        const imageId = targetStackData.imageIds[newImageIdIndex];
+
+        if (errorLoadingHandler) {
+          errorLoadingHandler(targetElem, imageId, error);
+        }
+      }
+    );
+  };
 }
 
 // let _x = Math.round(bbox.left);

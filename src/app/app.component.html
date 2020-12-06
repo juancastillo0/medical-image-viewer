@@ -32,7 +32,7 @@
           <button class="dropdown-button" ngPreserveWhitespaces
             style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
           <div class="dropdown-content">
-            <button (click)="clearTool(HistogramRegion.lastRoi)">Last ROI</button>
+            <button (click)="clearTool(HistogramRegion.lastRoi)">Selected ROI</button>
             <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
             <button (click)="clearTool(HistogramRegion.volume)">Volume</button>
           </div>
@@ -59,6 +59,9 @@
       <div class="row" style="justify-content: space-between;padding: 10px 0;">
         <button>
           Register
+        </button>
+        <button (click)="resetStackPosition()">
+          Reset
         </button>
         <div class="col" style="justify-content: space-between; align-items: center;">
           <label for="checkboxStackSynchronization" class="small-label">Sync Stack</label>
@@ -190,7 +193,7 @@
             [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.stackPosition}">Stack Position</button>
           <button (click)="selectHistogramRegion(HistogramRegion.lastRoi)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.lastRoi}">Last ROI</button>
+            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.lastRoi}">Selected ROI</button>
         </div>
         <div class="row" style="align-items: center;">
           <button (click)="selectHistogram(HistogramType.dist)"

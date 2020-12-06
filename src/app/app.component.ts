@@ -335,6 +335,7 @@ export class AppComponent {
   enabledTool = ToolName.Pan;
   selectedColormap = CornerstoneColormap.hotIron;
   lastRoiUuid?: string;
+  deltaStackIndex = 0;
   importedImageIds: Map<string, Array<string>> = new Map();
   volumeStats?: {
     count: number;
@@ -869,27 +870,36 @@ export class AppComponent {
           direction: 1 | -1;
         };
         data.stackPosition = eDetail.newImageIdIndex;
+        const otherData = this.otherData(data);
+        const otherIndex = Math.min(
+          Math.max(
+            otherData.currentStackIndex() +
+              (otherData.isLeft ? 1 : -1) * this.deltaStackIndex,
+            0
+          ),
+          otherData.stackSize - 1
+        );
 
         if (this.synchronizeStack) {
-          this.otherData(data).stackPosition = eDetail.newImageIdIndex;
           if (
             [this.imageDataLeft, this.imageDataRight].every((d) => d.loaded)
           ) {
             let retries = 0;
-            while (
-              retries < 5 &&
-              this.imageDataLeft.currentStackIndex() !==
-                this.imageDataRight.currentStackIndex()
-            ) {
+            while (retries < 5 && eDetail.newImageIdIndex !== otherIndex) {
               await new Promise((resolve) => setTimeout(resolve, 20));
               retries++;
             }
           }
+          otherData.stackPosition = data.isLeft
+            ? this.imageDataRight.currentStackIndex()
+            : this.imageDataLeft.currentStackIndex();
 
           for (const d of [this.imageDataLeft, this.imageDataRight]) {
             if (
               !d.loaded ||
-              eDetail.newImageIdIndex !== d.currentStackIndex()
+              (d === data &&
+                eDetail.newImageIdIndex !== d.currentStackIndex()) ||
+              (d !== otherData && otherIndex === d.currentStackIndex())
             ) {
               return;
             }
@@ -1101,7 +1111,7 @@ export class AppComponent {
           //   imageId: this.imageDataRight.imageId,
           // };
         }
-
+        console.log('max', diffData.max, 'min', diffData.min);
         for (const p of diffData.array) {
           const value = Math.floor(
             ((p.diff - diffData.min) / (diffData.max - diffData.min)) * 255
@@ -1271,11 +1281,13 @@ export class AppComponent {
         cornerstone.EVENTS.IMAGE_RENDERED,
         (_synchronizer, target, source, eventData) => {
           if (this.synchronizeStack) {
-            return cornerstoneTools.stackImageIndexSynchronizer(
+            return this.cornerstoneService.stackImageIndexSynchronizer(
               _synchronizer,
               target,
               source,
-              eventData
+              this.imageDataLeft.getElement().id === target.id
+                ? this.deltaStackIndex
+                : -this.deltaStackIndex
             );
           }
         }
@@ -1394,6 +1406,13 @@ export class AppComponent {
         cornerstoneTools.setToolActive(config.name, config.options ?? {});
       }
     }
+  };
+
+  resetStackPosition = () => {
+    const indexLeft = this.imageDataLeft.currentStackIndex();
+    const indexRight = this.imageDataRight.currentStackIndex();
+    this.deltaStackIndex = indexLeft - indexRight;
+    this.synchronizeStack = true;
   };
 
   selectMetadata = (isLeft: boolean) => {

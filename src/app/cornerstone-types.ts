@@ -184,7 +184,11 @@ export type CornerstoneToolsModule = {
   importInternal: (uri: string) => any;
   init: () => void;
   isToolActiveForElement: (element: HTMLElement, name: string) => void;
-  loadHandlerManager: object;
+  loadHandlerManager: {
+    getStartLoadHandler: (element: HTMLElement) => any;
+    getErrorLoadingHandler: (element: HTMLElement) => any;
+    getEndLoadHandler: (element: HTMLElement) => any;
+  };
   newFrameOfReferenceSpecificToolStateManager: () => void;
   newImageIdSpecificToolStateManager: () => void;
   newStackSpecificToolStateManager: (toolNames, oldStateManager) => void;
