@@ -10,12 +10,16 @@ export type BBox = {
 };
 
 export const getBoundingBox = (points: { x: number; y: number }[]): BBox => {
-  const right = points.reduce((p, c) => Math.max(p, c.x), 0);
-  const left = points.reduce((p, c) => Math.min(p, c.x), Number.MAX_VALUE);
-  const width = Math.floor(right - left);
-  const bottom = points.reduce((p, c) => Math.max(p, c.y), 0);
-  const top = points.reduce((p, c) => Math.min(p, c.y), Number.MAX_VALUE);
-  const height = Math.floor(bottom - top);
+  const right = Math.ceil(points.reduce((p, c) => Math.max(p, c.x), 0));
+  const left = Math.floor(
+    points.reduce((p, c) => Math.min(p, c.x), Number.MAX_VALUE)
+  );
+  const width = right - left;
+  const bottom = Math.ceil(points.reduce((p, c) => Math.max(p, c.y), 0));
+  const top = Math.floor(
+    points.reduce((p, c) => Math.min(p, c.y), Number.MAX_VALUE)
+  );
+  const height = bottom - top;
   return {
     top,
     bottom,
@@ -23,6 +27,21 @@ export const getBoundingBox = (points: { x: number; y: number }[]): BBox => {
     right,
     width,
     height,
+  };
+};
+
+export const rescaleBoundingBox = (bbox: BBox, ratio: number): BBox => {
+  const left = Math.floor(bbox.left * ratio);
+  const right = Math.ceil(bbox.right * ratio);
+  const top = Math.floor(bbox.top * ratio);
+  const bottom = Math.ceil(bbox.bottom * ratio);
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    height: bottom - top,
+    width: right - left,
   };
 };
 
