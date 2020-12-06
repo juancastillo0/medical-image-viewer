@@ -21,7 +21,12 @@ import {
   getToolFromName,
 } from './cornerstone.service';
 import { ImageMetadataService } from './image-metadata.service';
-import { BBox, getBoundingBox, roisAreEqual } from './utils';
+import {
+  BBox,
+  getBoundingBox,
+  rescaleBoundingBox,
+  roisAreEqual,
+} from './utils';
 
 setWasmPaths(`${document.location.href}assets/`);
 tf.setBackend('wasm').then((loadedTFWasm) => {
@@ -975,33 +980,64 @@ export class AppComponent {
       );
       const otherData = this.otherData(data);
 
+      const pixelSpacing = cornerstone.getImage(data.getElement())
+        .columnPixelSpacing;
+      const otherPixelSpacing = cornerstone.getImage(otherData.getElement())
+        .columnPixelSpacing;
+      const ratio = otherPixelSpacing / pixelSpacing;
+
       for (let i = 0; i < dataList.length; i++) {
         const roi = dataList[i];
         let diffData: DiffData = _curr[roi.uuid].diffData;
+        console.log(roi.bbox);
 
         if (
           diffData?.imageId !== this.imageDataLeft.imageId ||
           !roisAreEqual(diffData?.points, roi.points)
         ) {
-          // TODO: different scale?
-          const otherPixels = cornerstone.getPixels(
-            otherData.getElement(),
-            roi.bbox.left,
-            roi.bbox.top,
-            roi.bbox.width,
-            roi.bbox.height
-          );
+          const otherBbox: BBox = rescaleBoundingBox(roi.bbox, ratio);
 
-          let left: number[];
-          let right: number[];
+          let otherPixels: number[] | tf.TypedArray = cornerstone.getPixels(
+            otherData.getElement(),
+            otherBbox.left,
+            otherBbox.top,
+            otherBbox.width,
+            otherBbox.height
+          );
+          let pixels: number[] | tf.TypedArray = roi.pixels;
+
+          let bbox: BBox = roi.bbox;
+          let points = roi.points;
+          if (ratio !== 1) {
+            // if (roi.bbox.width > otherBbox.width) {
+            otherPixels = resizeImage(
+              otherPixels,
+              { h: otherBbox.height, w: otherBbox.width },
+              { w: roi.bbox.width, h: roi.bbox.height }
+            ).dataSync();
+            // } else {
+            //   bbox = otherBbox;
+            //   points = roi.points.map((p) => ({
+            //     x: p.x * ratio,
+            //     y: p.y * ratio,
+            //   }));
+            //   pixels = resizeImage(
+            //     pixels,
+            //     { w: roi.bbox.width, h: roi.bbox.height },
+            //     { h: otherBbox.height, w: otherBbox.width }
+            //   ).dataSync();
+            // }
+          }
+
+          let left: number[] | tf.TypedArray;
+          let right: number[] | tf.TypedArray;
           if (data.isLeft) {
-            left = roi.pixels;
+            left = pixels;
             right = otherPixels;
           } else {
-            right = roi.pixels;
+            right = pixels;
             left = otherPixels;
           }
-          const bbox = roi.bbox;
 
           let index = 0;
           const differencePixels: Array<DiffPoint> = [];
@@ -1011,7 +1047,7 @@ export class AppComponent {
           for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
             for (let x = bbox.left; x < bbox.left + bbox.width; x++) {
               const inFreehand = this.cornerstoneService.pointInFreehand2(
-                roi.points,
+                points,
                 { x, y },
                 bbox
               );
