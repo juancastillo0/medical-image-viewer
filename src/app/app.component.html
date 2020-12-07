@@ -57,10 +57,11 @@
 
       <!-- STACK -->
       <div class="row" style="justify-content: space-between;padding: 10px 0;">
-        <button>
-          Register
+        <button (click)="registerImages()"
+          [disabled]="isLoadingRegistration || !imageDataLeft.loaded || !imageDataRight.loaded">
+          {{isLoadingRegistration ? 'Loading': 'Register'}}
         </button>
-        <button (click)="resetStackPosition()">
+        <button (click)="resetStackPosition()" [disabled]="!imageDataLeft.loaded || !imageDataRight.loaded">
           Reset
         </button>
         <div class="col" style="justify-content: space-between; align-items: center;">
@@ -122,6 +123,14 @@
           </div>
           <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
             (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
+        </div>
+        <div>
+          <button (click)="imageDataRight.translateOrRotate({x: -1})">L</button>
+          <button (click)="imageDataRight.translateOrRotate({x: 1})">R</button>
+          <button (click)="imageDataRight.translateOrRotate({y: -1})">U</button>
+          <button (click)="imageDataRight.translateOrRotate({y: 1})">D</button>
+          <input id="rotationRight" type="range" min="0" max="360" step="0.2" value={{imageDataRight.angle}}
+            (change)="imageDataRight.translateOrRotate({angle: rotationRight.value})" #rotationRight>
         </div>
       </div>
     </div>

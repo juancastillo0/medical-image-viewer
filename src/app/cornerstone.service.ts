@@ -8,6 +8,7 @@ import * as _cornerstoneNIFTIImageLoader from '@cornerstonejs/nifti-image-loader
 import * as _cornerstoneWebImageLoader from 'cornerstone-web-image-loader';
 import Hammer from 'hammerjs';
 import {
+  CornerstoneImage,
   CornerstoneModule,
   CornerstoneToolsModule,
   Offset,
@@ -15,6 +16,7 @@ import {
   SynchronizerCallback,
 } from './cornerstone-types';
 import { getBoundingBox } from './utils';
+import { ImageDataC } from './app.component';
 
 export const cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
 export const cornerstone: CornerstoneModule = _cornerstone;
@@ -209,9 +211,14 @@ export class CornerstoneService {
     cornerstoneWADOImageLoader.webWorkerManager.initialize(config);
     // cornerstone.registerImageLoader('blob', cornerstoneWebImageLoader);
     cornerstoneWebImageLoader.configure({ beforeSend: () => {} });
+
+    cornerstone.registerUnknownImageLoader(cornerstoneWebImageLoader.loadImage);
   }
 
-  panZoomSynchronizer: SynchronizerCallback = (
+  panZoomSynchronizer: (
+    left: ImageDataC,
+    right: ImageDataC
+  ) => SynchronizerCallback = (left: ImageDataC, right: ImageDataC) => (
     synchronizer,
     sourceElement,
     targetElement
@@ -237,19 +244,28 @@ export class CornerstoneService {
       targetViewport.displayedArea.columnPixelSpacing /
       sourceViewport.displayedArea.columnPixelSpacing;
 
+    const sourceIsLeft = left.getElement().id === sourceElement.id;
+    const newx =
+      (sourceViewport.translation.x - (sourceIsLeft ? left.dx : right.dx)) /
+        ratio +
+      (sourceIsLeft ? right.dx : left.dx);
+    const newy =
+      (sourceViewport.translation.y - (sourceIsLeft ? left.dy : right.dy)) /
+        ratio +
+      (sourceIsLeft ? right.dy : left.dy);
     // Do nothing if the scale and translation are the same
     if (
       targetViewport.scale === sourceViewport.scale * ratio &&
-      targetViewport.translation.x === sourceViewport.translation.x / ratio &&
-      targetViewport.translation.y === sourceViewport.translation.y / ratio
+      targetViewport.translation.x === newx &&
+      targetViewport.translation.y === newy
     ) {
       return;
     }
 
     // Scale and/or translation are different, sync them
     targetViewport.scale = sourceViewport.scale * ratio;
-    targetViewport.translation.x = sourceViewport.translation.x / ratio;
-    targetViewport.translation.y = sourceViewport.translation.y / ratio;
+    targetViewport.translation.x = newx;
+    targetViewport.translation.y = newy;
     synchronizer.setViewport(targetElement, targetViewport);
   };
 
@@ -293,9 +309,11 @@ export class CornerstoneService {
     )?.data;
 
     if (!callbacks.shouldSynchronize()) {
-      for (const dataTarget of targetRois) {
-        if (dataTarget.area > 0.1 || dataTarget.canComplete) {
-          callbacks.onUpdateCompleted(dataTarget, targetElement);
+      if (targetRois) {
+        for (const dataTarget of targetRois) {
+          if (dataTarget.area > 0.1 || dataTarget.canComplete) {
+            callbacks.onUpdateCompleted(dataTarget, targetElement);
+          }
         }
       }
       return;
@@ -499,20 +517,39 @@ export class CornerstoneService {
         canvas.toBlob(r);
       });
     };
+    const imLeft = cornerstone.getImage(elemLeft);
+    const imRight = cornerstone.getImage(elemRight);
     const blobs = await Promise.all([
       toBlob(elemLeft.querySelector('canvas')),
       toBlob(elemRight.querySelector('canvas')),
     ]);
     const formData = new FormData();
-    formData.append('cut1', blobs[0]);
-    formData.append('cut2', blobs[1]);
+    // formData.append('cut1', blobs[0]);
+    // formData.append('cut2', blobs[1]);
+    formData.append(
+      'cut1',
+      new Blob([((imLeft.getPixelData() as any) as Uint16Array).buffer], {
+        type: 'application/octet-stream',
+      })
+    );
+    formData.append(
+      'cut2',
+      new Blob([((imRight.getPixelData() as any) as Uint16Array).buffer], {
+        type: 'application/octet-stream',
+      })
+    );
 
-    const response = await fetch('http://127.0.0.1:5000/files/registration', {
-      method: 'POST',
-      body: formData,
-    });
+    const queryParams = `?lw=${imLeft.width}&lh=${imLeft.height}&rw=${imRight.width}&rh=${imRight.height}`;
 
-    let image: string;
+    const response = await fetch(
+      `http://127.0.0.1:5000/files/registration${queryParams}`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    let image: CornerstoneImage;
     if (response.ok) {
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);

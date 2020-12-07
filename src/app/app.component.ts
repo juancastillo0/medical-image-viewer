@@ -27,6 +27,7 @@ import {
   rescaleBoundingBox,
   roisAreEqual,
 } from './utils';
+import * as Plotly from 'plotly.js';
 
 setWasmPaths(`${document.location.href}assets/`);
 tf.setBackend('wasm').then((loadedTFWasm) => {
@@ -148,7 +149,7 @@ type ImageStackData = {
   };
 };
 
-class ImageData {
+export class ImageDataC {
   constructor(
     getElement: () => HTMLDivElement,
     { isLeft }: { isLeft: boolean }
@@ -162,6 +163,10 @@ class ImageData {
   loaded = false;
   visible = true;
   opacity = 0.7;
+  angle = 0;
+  dx = 0;
+  dy = 0;
+
   stackPosition?: number;
   stackSize?: number;
   parsingResult?: ParsingResult = undefined;
@@ -180,6 +185,21 @@ class ImageData {
       'stack'
     ) as StackToolState;
     return stackState.data[0].currentImageIdIndex;
+  };
+
+  translateOrRotate = (d: { x?: number; y?: number; angle?: number }) => {
+    const element = this.getElement();
+    const viewport = cornerstone.getViewport(element);
+    this.angle = d.angle ?? viewport.rotation;
+    this.dx = this.dx + (d.x ?? 0);
+    this.dy = this.dy + (d.y ?? 0);
+
+    viewport.rotation = this.angle;
+    viewport.translation.x += (d.x ?? 0);
+    viewport.translation.y += (d.y ?? 0);
+
+    cornerstone.setViewport(element, viewport);
+    cornerstone.updateImage(element);
   };
 
   currentStackPoints = (
@@ -356,17 +376,18 @@ export class AppComponent {
     stdRightOwn: number;
   };
 
-  imageDataLeft = new ImageData(() => this._dicomImageLeftElem.nativeElement, {
+  imageDataLeft = new ImageDataC(() => this._dicomImageLeftElem.nativeElement, {
     isLeft: true,
   });
-  imageDataRight = new ImageData(
+  imageDataRight = new ImageDataC(
     () => this._dicomImageRightElem.nativeElement,
     { isLeft: false }
   );
-  selectedSide: ImageData;
+  selectedSide: ImageDataC;
 
   synchronizeRoi = true;
   synchronizeStack = true;
+  isLoadingRegistration = false;
 
   get allLoaded(): boolean {
     (window as any).dataL = this.imageDataLeft;
@@ -398,7 +419,7 @@ export class AppComponent {
     return this._canvasCompElem?.nativeElement;
   }
 
-  changeImage = (selectElem: HTMLSelectElement, imageData: ImageData) => {
+  changeImage = (selectElem: HTMLSelectElement, imageData: ImageDataC) => {
     if (selectElem.value === 'IMPORT') {
       selectElem.value = imageData.imageId;
       const _elemId = `fileInput${
@@ -429,7 +450,7 @@ export class AppComponent {
     }
   };
 
-  updateLayerOpacity = (opacity: number, imageData: ImageData) => {
+  updateLayerOpacity = (opacity: number, imageData: ImageDataC) => {
     imageData.opacity = opacity;
     if (this.allLoaded) {
       const layer = cornerstone.getLayer(
@@ -442,7 +463,7 @@ export class AppComponent {
     }
   };
 
-  updateLayerVisibility = (imageData: ImageData) => {
+  updateLayerVisibility = (imageData: ImageDataC) => {
     imageData.visible = !imageData.visible;
     this.synchronizeRoiPoints(imageData);
     cornerstone.updateImage(imageData.getElement());
@@ -506,7 +527,7 @@ export class AppComponent {
   };
 
   _didChangeRoi = (data: RoiData, element: HTMLElement): boolean => {
-    let imageData: ImageData;
+    let imageData: ImageDataC;
     if (element.id === this.imageDataLeft.getElement().id) {
       imageData = this.imageDataLeft;
     } else {
@@ -528,7 +549,7 @@ export class AppComponent {
   };
 
   _onRoiEdited = (data: RoiData, element: HTMLElement): boolean => {
-    let imageData: ImageData;
+    let imageData: ImageDataC;
     if (element.id === this.imageDataLeft.getElement().id) {
       imageData = this.imageDataLeft;
     } else {
@@ -644,13 +665,18 @@ export class AppComponent {
             title: 'Pixel Count',
           },
         },
+        color: {
+          field: 'delta',
+          type: 'quantitative',
+          bin: true,
+        },
       },
     };
 
     embed('#diffChart', specDiff);
   };
 
-  uploadFile = (fileList: FileList, data: ImageData): void => {
+  uploadFile = (fileList: FileList, data: ImageDataC): void => {
     const files: File[] = [];
     console.log(fileList);
     // tslint:disable-next-line prefer-for-of
@@ -706,13 +732,13 @@ export class AppComponent {
     }
   };
 
-  otherData = (data: ImageData) =>
+  otherData = (data: ImageDataC) =>
     data === this.imageDataLeft ? this.imageDataRight : this.imageDataLeft;
 
   loadAndViewImages = async (
     fileName: string,
     imageIds: Array<string>,
-    data: ImageData,
+    data: ImageDataC,
     isNewImport: boolean
   ): Promise<void> => {
     // if (data.loaded){
@@ -928,7 +954,7 @@ export class AppComponent {
     data.loading = false;
   };
 
-  synchronizeRoiPoints = (data: ImageData): boolean => {
+  synchronizeRoiPoints = (data: ImageDataC): boolean => {
     const elem = data.getElement();
     const stackPointCurr = data.currentStackPoints() ?? {};
     const state = cornerstoneTools.getToolState(elem, ToolName.FreehandRoi) ?? {
@@ -978,7 +1004,7 @@ export class AppComponent {
     return result;
   };
 
-  createGetPixelData = (data: ImageData): (() => number[]) => {
+  createGetPixelData = (data: ImageDataC): (() => number[]) => {
     return () => {
       const _curr = data.currentStackPoints();
       const dataList = data.getRoiPixels();
@@ -1077,16 +1103,14 @@ export class AppComponent {
                 maxDiff = Math.max(maxDiff, diff);
                 minDiff = Math.min(minDiff, diff);
                 sumDiff += diff;
-                const xInt = Math.round(x);
-                const yInt = Math.round(y);
 
                 differencePixels.push({
                   left: left[index],
                   right: right[index],
-                  index: yInt * data.dynamicImage.width + xInt,
+                  index: y * data.dynamicImage.width + x,
                   diff,
-                  x: xInt,
-                  y: yInt,
+                  x,
+                  y,
                 });
               }
               index++;
@@ -1204,7 +1228,7 @@ export class AppComponent {
       { left: 0, right: 0, diff: 0 }
     );
 
-    const _sideStats = (data: ImageData) => {
+    const _sideStats = (data: ImageDataC) => {
       return data
         .getData(this.selectedHistogramRegion, this.lastRoiUuid)
         .reduce(
@@ -1275,7 +1299,10 @@ export class AppComponent {
     if (this.allLoaded) {
       const synchronizer: Synchronizer = new cornerstoneTools.Synchronizer(
         cornerstone.EVENTS.IMAGE_RENDERED,
-        this.cornerstoneService.panZoomSynchronizer
+        this.cornerstoneService.panZoomSynchronizer(
+          this.imageDataLeft,
+          this.imageDataRight
+        )
       );
       const synchronizerStack = new cornerstoneTools.Synchronizer(
         cornerstone.EVENTS.IMAGE_RENDERED,
@@ -1410,9 +1437,42 @@ export class AppComponent {
 
   resetStackPosition = () => {
     const indexLeft = this.imageDataLeft.currentStackIndex();
+    // TODO:
+    // const pL = this.imageDataLeft.roiPointsByStack.flatMap(s => Object.values(s));
+    // const pR = this.imageDataRight.roiPointsByStack.flatMap(s => Object.values(s));
+    // for (const v of pL) {
+    //   if (pR[v.uuid] !== undefined){
+
+    //   }
+    // }
+    this.imageDataLeft.removeData(HistogramRegion.volume, '');
+    this.imageDataRight.removeData(HistogramRegion.volume, '');
+
     const indexRight = this.imageDataRight.currentStackIndex();
     this.deltaStackIndex = indexLeft - indexRight;
     this.synchronizeStack = true;
+  };
+
+  registerImages = async () => {
+    const indexRight = this.imageDataRight.currentStackIndex();
+    this.isLoadingRegistration = true;
+    const response = await this.cornerstoneService.imageRegistration(
+      this.imageDataLeft.getElement(),
+      this.imageDataRight.getElement()
+    );
+
+    if (!!response.image) {
+      const element = this.imageDataRight.getElement();
+      const stackState = (cornerstoneTools.getToolState(
+        element,
+        'stack'
+      ) as StackToolState).data[0];
+      stackState.imageIds[indexRight] = response.image.imageId;
+      // cornerstoneTools.clearToolState(element, 'stack');
+      // cornerstoneTools.addToolState(element, 'stack', stackState);
+      cornerstone.updateImage(element, true);
+    }
+    this.isLoadingRegistration = false;
   };
 
   selectMetadata = (isLeft: boolean) => {
