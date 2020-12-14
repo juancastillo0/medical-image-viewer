@@ -3,15 +3,19 @@ import {
   CORNERSTONE_TOOLS_EVENTS,
 } from './cornerstone-events';
 
-export type RoiDataHandles = {
-  invalidHandlePlacement: boolean;
-  points: {
+export type RoiDataHandlesPoint = {
+  x: number;
+  y: number;
+  highlight: boolean;
+  active: boolean;
+  lines: {
     x: number;
     y: number;
-    highlight: boolean;
-    active: boolean;
-    lines: { x: number; y: number }[];
   }[];
+};
+export type RoiDataHandles = {
+  invalidHandlePlacement: boolean;
+  points: RoiDataHandlesPoint[];
   textBox: {
     active: boolean;
     hasMoved: boolean;

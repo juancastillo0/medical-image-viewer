@@ -1334,6 +1334,26 @@ export class AppComponent {
               ? this.imageDataLeft.visible
               : this.imageDataRight.visible,
           shouldSynchronize: () => this.synchronizeRoi && this.synchronizeStack,
+          getTranslation: (source, target) => {
+            const result = {
+              dx: this.imageDataRight.dx,
+              dy: this.imageDataRight.dy,
+            };
+            const ratio =
+                this.imageDataLeft.dynamicImage.columnPixelSpacing /
+                this.imageDataRight.dynamicImage.columnPixelSpacing;
+
+            if (this.imageDataLeft.getElement().id === source.id) {
+              console.log("top");
+              result.dx = -result.dx;
+              result.dy = -result.dy;
+            } else {
+              console.log("bottom");
+              result.dx = result.dx / ratio;
+              result.dy = result.dy / ratio;
+            }
+            return result;
+          },
         })
       );
 
@@ -1459,23 +1479,35 @@ export class AppComponent {
   registerImages = async () => {
     const indexRight = this.imageDataRight.currentStackIndex();
     this.isLoadingRegistration = true;
-    const response = await this.cornerstoneService.imageRegistration(
-      this.imageDataLeft.getElement(),
-      this.imageDataRight.getElement()
-    );
+    try {
+      const response = await this.cornerstoneService.imageRegistration(
+        this.imageDataLeft.getElement(),
+        this.imageDataRight.getElement()
+      );
 
-    if (!!response.image) {
-      const element = this.imageDataRight.getElement();
-      const stackState = (cornerstoneTools.getToolState(
-        element,
-        'stack'
-      ) as StackToolState).data[0];
-      stackState.imageIds[indexRight] = response.image.imageId;
-      // cornerstoneTools.clearToolState(element, 'stack');
-      // cornerstoneTools.addToolState(element, 'stack', stackState);
-      cornerstone.updateImage(element, true);
+      if ('imageId' in response.data) {
+        const element = this.imageDataRight.getElement();
+        const stackState = (cornerstoneTools.getToolState(
+          element,
+          'stack'
+        ) as StackToolState).data[0];
+        stackState.imageIds[indexRight] = response.data.imageId;
+        // cornerstoneTools.clearToolState(element, 'stack');
+        // cornerstoneTools.addToolState(element, 'stack', stackState);
+        cornerstone.updateImage(element, true);
+      } else if (!!response.data) {
+        const transform = response.data;
+        this.imageDataRight.translateOrRotate({
+          x: this.imageDataRight.dx + (transform.centerx - transform.deltax),
+          y: this.imageDataRight.dy + (transform.centery - transform.deltay),
+          angle: -(transform.angle * 180) / Math.PI,
+        });
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      this.isLoadingRegistration = false;
     }
-    this.isLoadingRegistration = false;
   };
 
   selectMetadata = (isLeft: boolean) => {

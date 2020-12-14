@@ -13,6 +13,7 @@ import {
   CornerstoneToolsModule,
   Offset,
   RoiData,
+  RoiDataHandlesPoint,
   SynchronizerCallback,
 } from './cornerstone-types';
 import { getBoundingBox } from './utils';
@@ -52,6 +53,19 @@ type RoiSyncCallback = {
   didChangeRoi: (data: RoiData, element: HTMLElement) => boolean;
   getImageVisibility: (element: HTMLElement) => boolean;
   shouldSynchronize: () => boolean;
+  getTranslation: (
+    source: HTMLElement,
+    target: HTMLElement
+  ) => { dx: number; dy: number };
+};
+
+export type TransformationParms = {
+  scale: number;
+  angle: number;
+  deltax: number;
+  deltay: number;
+  centerx: number;
+  centery: number;
 };
 
 (window as any).getToolFromName = getToolFromName;
@@ -324,6 +338,15 @@ export class CornerstoneService {
     const ratio =
       targetViewport.displayedArea.columnPixelSpacing /
       sourceViewport.displayedArea.columnPixelSpacing;
+    const _translation = callbacks.getTranslation(sourceElement, targetElement);
+
+    const makeNewPoint = (p: RoiDataHandlesPoint) => {
+      return {
+        ...p,
+        x: (p.x - _translation.dx) * ratio,
+        y: (p.y - _translation.dy) * ratio,
+      };
+    };
 
     const addData = (element: HTMLElement, dataList: RoiData[]) => {
       console.log('addData');
@@ -334,11 +357,7 @@ export class CornerstoneService {
         console.log(data, visible);
         const newData = { ...data, visible: data.area < 0.1 || visible };
         newData.handles = { ...newData.handles };
-        newData.handles.points = newData.handles.points.map((p) => ({
-          ...p,
-          x: p.x * ratio,
-          y: p.y * ratio,
-        }));
+        newData.handles.points = newData.handles.points.map(makeNewPoint);
 
         cornerstoneTools.addToolState(element, ToolName.FreehandRoi, newData);
         if (newData.canComplete || data.area > 0.1) {
@@ -384,11 +403,7 @@ export class CornerstoneService {
               visible: dataTarget.area < 0.1 || visible,
             };
             newData.handles = { ...newData.handles };
-            newData.handles.points = newData.handles.points.map((p) => ({
-              ...p,
-              x: p.x * ratio,
-              y: p.y * ratio,
-            }));
+            newData.handles.points = newData.handles.points.map(makeNewPoint);
 
             cornerstoneTools.addToolState(
               sourceElement,
@@ -549,20 +564,30 @@ export class CornerstoneService {
       }
     );
 
-    let image: CornerstoneImage;
+    let data: CornerstoneImage | TransformationParms;
     if (response.ok) {
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      image = await cornerstoneWebImageLoader.loadImage(blobUrl).promise;
-      console.log(image);
+      console.log(response);
+      console.log(response.headers.get('Content-Type'));
+      if (response.headers.get('Content-Type') === 'application/json') {
+        data = await response.json();
+      } else {
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        data = await cornerstoneWebImageLoader.loadImage(blobUrl).promise;
+      }
+      console.log(data);
     }
-    return { response, image };
+    return { response, data };
   };
 
   rotateViewport = () => {
     // const viewport = cornerstone.getViewport(element);
     // viewport.rotation -= 5;
     // cornerstone.setViewport(element, viewport);
+    // titulo
+    // abstract
+    // imagen
+    // video 3min
   };
 
   stackImageIndexSynchronizer: SynchronizerCallback = (
