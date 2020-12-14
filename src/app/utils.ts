@@ -30,11 +30,19 @@ export const getBoundingBox = (points: { x: number; y: number }[]): BBox => {
   };
 };
 
-export const rescaleBoundingBox = (bbox: BBox, ratio: number): BBox => {
-  const left = Math.floor(bbox.left * ratio);
-  const right = Math.ceil(bbox.right * ratio);
-  const top = Math.floor(bbox.top * ratio);
-  const bottom = Math.ceil(bbox.bottom * ratio);
+export const rescaleBoundingBox = (bbox: BBox, translate: (p: {
+  x: number;
+  y: number;
+}) => {
+  x: number;
+  y: number;
+}): BBox => {
+  const topLeft = translate({x: bbox.left, y: bbox.top})
+  const bottomRight = translate({x: bbox.right, y: bbox.bottom})
+  const left = Math.floor(topLeft.x);
+  const right = Math.ceil(bottomRight.x);
+  const top = Math.floor(topLeft.y);
+  const bottom = Math.ceil(bottomRight.y);
   return {
     left,
     right,

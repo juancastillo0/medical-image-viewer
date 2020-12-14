@@ -11,6 +11,7 @@ import {
   CornerstoneImage,
   CornerstoneModule,
   CornerstoneToolsModule,
+  CornerstoneViewport,
   Offset,
   RoiData,
   RoiDataHandlesPoint,
@@ -229,6 +230,64 @@ export class CornerstoneService {
     cornerstone.registerUnknownImageLoader(cornerstoneWebImageLoader.loadImage);
   }
 
+  calculateScaleRatio = (
+    _sourceViewport: CornerstoneViewport | HTMLElement,
+    _targetViewport: CornerstoneViewport | HTMLElement
+  ): number => {
+    let sourceViewport: CornerstoneViewport;
+    if (_sourceViewport instanceof HTMLElement) {
+      sourceViewport = cornerstone.getViewport(_sourceViewport);
+    } else {
+      sourceViewport = _sourceViewport;
+    }
+    let targetViewport: CornerstoneViewport;
+    if (_targetViewport instanceof HTMLElement) {
+      targetViewport = cornerstone.getViewport(_targetViewport);
+    } else {
+      targetViewport = _targetViewport;
+    }
+
+    if (false) {
+      return (
+        sourceViewport.displayedArea.brhc.x /
+        targetViewport.displayedArea.brhc.x
+      );
+    } else {
+      return (
+        targetViewport.displayedArea.columnPixelSpacing /
+        sourceViewport.displayedArea.columnPixelSpacing
+      );
+    }
+  };
+
+  buildTranslatePoints = (
+    sourceElement: HTMLElement,
+    targetElement: HTMLElement,
+    getTranslation: (
+      source: HTMLElement,
+      target: HTMLElement
+    ) => {
+      dx: number;
+      dy: number;
+    }
+  ) => {
+    const sourceViewport = cornerstone.getViewport(sourceElement);
+    const targetViewport = cornerstone.getViewport(targetElement);
+
+    const ratio = this.calculateScaleRatio(sourceViewport, targetViewport);
+    const _translation = getTranslation(sourceElement, targetElement);
+    return (p: { x: number; y: number }) => ({
+      x:
+        (p.x - _translation.dx - targetViewport.displayedArea.brhc.x / 2) *
+          ratio +
+        sourceViewport.displayedArea.brhc.x / 2,
+      y:
+        (p.y - _translation.dy - targetViewport.displayedArea.brhc.y / 2) *
+          ratio +
+        sourceViewport.displayedArea.brhc.y / 2,
+    });
+  };
+
   panZoomSynchronizer: (
     left: ImageDataC,
     right: ImageDataC
@@ -254,9 +313,7 @@ export class CornerstoneService {
     // targetViewport.displayedArea.columnPixelSpacing = columnSpacing
     // targetViewport.displayedArea.columnPixelSpacing = columnSpacing
 
-    const ratio =
-      targetViewport.displayedArea.columnPixelSpacing /
-      sourceViewport.displayedArea.columnPixelSpacing;
+    const ratio = this.calculateScaleRatio(sourceViewport, targetViewport);
 
     const sourceIsLeft = left.getElement().id === sourceElement.id;
     const newx =
@@ -332,19 +389,16 @@ export class CornerstoneService {
       }
       return;
     }
-    const sourceViewport = cornerstone.getViewport(sourceElement);
-    const targetViewport = cornerstone.getViewport(targetElement);
-
-    const ratio =
-      targetViewport.displayedArea.columnPixelSpacing /
-      sourceViewport.displayedArea.columnPixelSpacing;
-    const _translation = callbacks.getTranslation(sourceElement, targetElement);
+    const _translatePoint = this.buildTranslatePoints(
+      sourceElement,
+      targetElement,
+      callbacks.getTranslation
+    );
 
     const makeNewPoint = (p: RoiDataHandlesPoint) => {
       return {
         ...p,
-        x: (p.x - _translation.dx) * ratio,
-        y: (p.y - _translation.dy) * ratio,
+        ..._translatePoint(p),
       };
     };
 
@@ -525,7 +579,8 @@ export class CornerstoneService {
 
   imageRegistration = async (
     elemLeft: HTMLDivElement,
-    elemRight: HTMLDivElement
+    elemRight: HTMLDivElement,
+    options: { method: string }
   ) => {
     const toBlob = (canvas: HTMLCanvasElement) => {
       return new Promise<Blob | null>((r) => {
@@ -554,7 +609,7 @@ export class CornerstoneService {
       })
     );
 
-    const queryParams = `?lw=${imLeft.width}&lh=${imLeft.height}&rw=${imRight.width}&rh=${imRight.height}`;
+    const queryParams = `?lw=${imLeft.width}&lh=${imLeft.height}&rw=${imRight.width}&rh=${imRight.height}&method=${options.method}`;
 
     const response = await fetch(
       `http://127.0.0.1:5000/files/registration${queryParams}`,

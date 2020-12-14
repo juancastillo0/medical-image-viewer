@@ -356,6 +356,7 @@ export class AppComponent {
   selectedColormap = CornerstoneColormap.hotIron;
   lastRoiUuid?: string;
   deltaStackIndex = 0;
+  registerMethod: string = '4';
   importedImageIds: Map<string, Array<string>> = new Map();
   volumeStats?: {
     count: number;
@@ -669,6 +670,7 @@ export class AppComponent {
           field: 'delta',
           type: 'quantitative',
           bin: true,
+          legend: null,
         },
       },
     };
@@ -1019,11 +1021,15 @@ export class AppComponent {
       );
       const otherData = this.otherData(data);
 
-      const pixelSpacing = cornerstone.getImage(data.getElement())
-        .columnPixelSpacing;
-      const otherPixelSpacing = cornerstone.getImage(otherData.getElement())
-        .columnPixelSpacing;
-      const ratio = pixelSpacing / otherPixelSpacing;
+      const translatePoints = this.cornerstoneService.buildTranslatePoints(
+        otherData.getElement(),
+        data.getElement(),
+        this.getTranslation
+      )
+      const ratio = this.cornerstoneService.calculateScaleRatio(
+        otherData.getElement(),
+        data.getElement()
+      );
 
       for (let i = 0; i < dataList.length; i++) {
         const roi = dataList[i];
@@ -1034,7 +1040,7 @@ export class AppComponent {
           diffData?.imageId !== this.imageDataLeft.imageId ||
           !roisAreEqual(diffData?.points, roi.points)
         ) {
-          const otherBbox: BBox = rescaleBoundingBox(roi.bbox, ratio);
+          const otherBbox: BBox = rescaleBoundingBox(roi.bbox, translatePoints);
 
           let otherPixels: number[] | tf.TypedArray = cornerstone.getPixels(
             otherData.getElement(),
@@ -1119,6 +1125,9 @@ export class AppComponent {
               index++;
             }
           }
+          // const ordered = differencePixels.sort((a, b) => a.diff - b.diff);
+          // const p5 = ordered[Math.ceil(ordered.length * 0.05)];
+          // const p95 = ordered[Math.floor(ordered.length * 0.95)];
           diffData = {
             array: differencePixels,
             max: maxDiff,
@@ -1140,6 +1149,11 @@ export class AppComponent {
         }
         console.log('max', diffData.max, 'min', diffData.min);
         for (const p of diffData.array) {
+          // if (p.diff > diffData.max) {
+          //   p.diff = diffData.max;
+          // } else if (p.diff < diffData.min) {
+          //   p.diff = diffData.min;
+          // }
           const value = Math.floor(
             ((p.diff - diffData.min) / (diffData.max - diffData.min)) * 255
           );
@@ -1334,26 +1348,7 @@ export class AppComponent {
               ? this.imageDataLeft.visible
               : this.imageDataRight.visible,
           shouldSynchronize: () => this.synchronizeRoi && this.synchronizeStack,
-          getTranslation: (source, target) => {
-            const result = {
-              dx: this.imageDataRight.dx,
-              dy: this.imageDataRight.dy,
-            };
-            const ratio =
-                this.imageDataLeft.dynamicImage.columnPixelSpacing /
-                this.imageDataRight.dynamicImage.columnPixelSpacing;
-
-            if (this.imageDataLeft.getElement().id === source.id) {
-              console.log("top");
-              result.dx = -result.dx;
-              result.dy = -result.dy;
-            } else {
-              console.log("bottom");
-              result.dx = result.dx / ratio;
-              result.dy = result.dy / ratio;
-            }
-            return result;
-          },
+          getTranslation: this.getTranslation,
         })
       );
 
@@ -1458,6 +1453,10 @@ export class AppComponent {
     }
   };
 
+  selectRegisterMethod = (method: string) => {
+    this.registerMethod = method;
+  };
+
   resetStackPosition = () => {
     const indexLeft = this.imageDataLeft.currentStackIndex();
     // TODO:
@@ -1482,7 +1481,10 @@ export class AppComponent {
     try {
       const response = await this.cornerstoneService.imageRegistration(
         this.imageDataLeft.getElement(),
-        this.imageDataRight.getElement()
+        this.imageDataRight.getElement(),
+        {
+          method: this.registerMethod,
+        }
       );
 
       if ('imageId' in response.data) {
@@ -1526,6 +1528,28 @@ export class AppComponent {
   onSearchInput = (inputStr: string) => {
     this.metadataFilter = inputStr.toLowerCase();
     this._updateMetadata();
+  };
+
+  getTranslation = (source: HTMLElement, target: HTMLElement) => {
+    const result = {
+      dx: this.imageDataRight.dx,
+      dy: this.imageDataRight.dy,
+    };
+    const ratio = this.cornerstoneService.calculateScaleRatio(
+      this.imageDataRight.getElement(),
+      this.imageDataLeft.getElement()
+    );
+
+    if (this.imageDataLeft.getElement().id === source.id) {
+      console.log('top');
+      result.dx = -result.dx;
+      result.dy = -result.dy;
+    } else {
+      console.log('bottom');
+      result.dx = result.dx / ratio;
+      result.dy = result.dy / ratio;
+    }
+    return result;
   };
 
   private _updateMetadata = () => {

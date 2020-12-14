@@ -257,7 +257,7 @@ type LUT = {
   lut: Array<any>;
 };
 
-type CornerstoneViewport = {
+export type CornerstoneViewport = {
   scale: number;
   translation: Offset;
   voi: { windowWidth: number; windowCenter: number };
