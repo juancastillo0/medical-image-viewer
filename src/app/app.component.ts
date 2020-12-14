@@ -195,8 +195,8 @@ export class ImageDataC {
     this.dy = this.dy + (d.y ?? 0);
 
     viewport.rotation = this.angle;
-    viewport.translation.x += (d.x ?? 0);
-    viewport.translation.y += (d.y ?? 0);
+    viewport.translation.x += d.x ?? 0;
+    viewport.translation.y += d.y ?? 0;
 
     cornerstone.setViewport(element, viewport);
     cornerstone.updateImage(element);
@@ -897,14 +897,16 @@ export class AppComponent {
         };
         data.stackPosition = eDetail.newImageIdIndex;
         const otherData = this.otherData(data);
-        const otherIndex = Math.min(
-          Math.max(
-            otherData.currentStackIndex() +
-              (otherData.isLeft ? 1 : -1) * this.deltaStackIndex,
-            0
-          ),
-          otherData.stackSize - 1
-        );
+        const otherIndex = otherData.loaded
+          ? Math.min(
+              Math.max(
+                otherData.currentStackIndex() +
+                  (otherData.isLeft ? 1 : -1) * this.deltaStackIndex,
+                0
+              ),
+              otherData.stackSize - 1
+            )
+          : 0;
 
         if (this.synchronizeStack) {
           if (
@@ -915,17 +917,18 @@ export class AppComponent {
               await new Promise((resolve) => setTimeout(resolve, 20));
               retries++;
             }
+
+            otherData.stackPosition = data.isLeft
+              ? this.imageDataRight.currentStackIndex()
+              : this.imageDataLeft.currentStackIndex();
           }
-          otherData.stackPosition = data.isLeft
-            ? this.imageDataRight.currentStackIndex()
-            : this.imageDataLeft.currentStackIndex();
 
           for (const d of [this.imageDataLeft, this.imageDataRight]) {
             if (
               !d.loaded ||
               (d === data &&
                 eDetail.newImageIdIndex !== d.currentStackIndex()) ||
-              (d !== otherData && otherIndex === d.currentStackIndex())
+              (d === otherData && otherIndex === d.currentStackIndex())
             ) {
               return;
             }
