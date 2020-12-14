@@ -49,9 +49,13 @@
   }
 }
 
+#top-section {
+  height: 460px;
+  
+}
 .image-wrapper {
-  width: 440px;
-  height: 440px;
+  width: 460px;
+  height: 460px;
   position: relative;
   color: white;
   display: inline-block;
@@ -60,8 +64,8 @@
 }
 
 .image-inner {
-  width: 440px;
-  height: 440px;
+  width: 460px;
+  height: 460px;
   top: 0px;
   left: 0px;
   position: absolute;
