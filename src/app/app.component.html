@@ -13,7 +13,7 @@
 <div class="col" style="height: 100%;">
   <div class="row" style="justify-content: center;" id="top-section">
     <div class="col" style="width:220px;padding-right: 15px;overflow-y: auto;height:100%">
-      <h4>Config</h4>
+      <h4>Region of Interest</h4>
 
       <!-- TOOLS -->
       <div class="col" style="align-items: center;">
@@ -56,18 +56,21 @@
       </div>
 
       <!-- STACK -->
-      <div class="row" style="justify-content: space-between;padding: 10px 0;">
-        <button (click)="registerImages()"
-          [disabled]="isLoadingRegistration || !imageDataLeft.loaded || !imageDataRight.loaded">
-          {{isLoadingRegistration ? 'Loading': 'Register'}}
-        </button>
-        <button (click)="resetStackPosition()" [disabled]="!imageDataLeft.loaded || !imageDataRight.loaded">
-          Reset
-        </button>
-        <div class="col" style="justify-content: space-between; align-items: center;">
-          <label for="checkboxStackSynchronization" class="small-label">Sync Stack</label>
-          <input type="checkbox" id="checkboxStackSynchronization" [checked]="synchronizeStack"
-            (change)="updateStackSynchronization()" #checkboxStackSynchronization>
+      <div class="col">
+        <h4>Stack</h4>
+        <div class="row" style="justify-content: space-between;">
+          <button (click)="registerImages()"
+            [disabled]="isLoadingRegistration || !imageDataLeft.loaded || !imageDataRight.loaded">
+            {{isLoadingRegistration ? 'Loading': 'Register'}}
+          </button>
+          <button (click)="resetStackPosition()" [disabled]="!imageDataLeft.loaded || !imageDataRight.loaded">
+            Reset
+          </button>
+          <div class="col" style="justify-content: space-between; align-items: center;">
+            <label for="checkboxStackSynchronization" class="small-label">Sync Stack</label>
+            <input type="checkbox" id="checkboxStackSynchronization" [checked]="synchronizeStack"
+              (change)="updateStackSynchronization()" #checkboxStackSynchronization>
+          </div>
         </div>
       </div>
 
@@ -124,17 +127,19 @@
           <input id="layerOpacityRight" type="range" min="0" max="1" step="0.05" value={{imageDataRight.opacity}}
             (change)="updateLayerOpacity(layerOpacityRight.value, imageDataRight)" #layerOpacityRight>
         </div>
-        <div class="col" style="padding-top:3px;">
-          <div class="row">
+        <div class="col" style="padding-top:3px;padding-bottom:15px;">
+          <h4>Transform</h4>
+          <div class="row" id="translate-buttons-row">
             <button (click)="imageDataRight.translateOrRotate({x: -1})" class="small-label">Left</button>
             <button (click)="imageDataRight.translateOrRotate({x: 1})" class="small-label">Right</button>
             <button (click)="imageDataRight.translateOrRotate({y: -1})" class="small-label">Up</button>
             <button (click)="imageDataRight.translateOrRotate({y: 1})" class="small-label">Down</button>
           </div>
-          <div class="row">
-            <label for="rotationRight" class="small-label">Angle</label>
-            <input id="rotationRight" type="range" min="0" max="360" step="0.2" value={{imageDataRight.angle}}
-              (change)="imageDataRight.translateOrRotate({angle: rotationRight.value})" #rotationRight>
+          <div class="row" style="padding-top: 2px;">
+            <label for="rotationRight" class="small-label" style="padding-right: 4px;padding-top: 2px;">Angle</label>
+            <input id="rotationRight" style="flex:1;" type="range" min="0" max="360" step="0.2"
+              value={{imageDataRight.angle}} (change)="imageDataRight.translateOrRotate({angle: rotationRight.value})"
+              #rotationRight>
           </div>
         </div>
       </div>
@@ -243,15 +248,18 @@
           No matches for filter
         </div>
       </table>
-      <div *ngIf="selectedMetadata === undefined" style="padding: 0 5px;flex: 1;text-align: center;">
-        No metadata available
+      <div *ngIf="selectedMetadata === undefined" class="row"
+        style="justify-content: space-around;align-items: center;height: 100%;">
+        <div style="flex: 1;text-align: center;">
+          No metadata available.
+        </div>
       </div>
     </div>
     <div [ngClass]="{'hidden': currentInfoView !== InfoView.Comparison}" style="flex: 1;overflow: auto;">
       <div class="row" style="justify-content: space-around;align-items: center;height: 100%;">
         <!-- <canvas id="canvasComp" #canvasComp></canvas> -->
         <div *ngIf="volumeStats === undefined" style="flex: 1;text-align: center;">
-          No Comparison Available. Select a region of interest for the comparison.
+          No comparison available. Select a region of interest for the comparison.
         </div>
         <div *ngIf="volumeStats !== undefined" style="padding-left: 25px;">
           <table>
