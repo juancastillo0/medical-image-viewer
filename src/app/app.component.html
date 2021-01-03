@@ -29,8 +29,9 @@
       </div>
       <div style="align-self: center;padding: 5px 0;">
         <div class="dropdown">
-          <button class="dropdown-button" ngPreserveWhitespaces
-            style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
+          <!-- prettier-ignore-attribute -->
+          <button class="dropdown-button" ngPreserveWhitespaces style="white-space: break-spaces;">{{"Clear  ▼"}}</button>
+          <!-- prettier-ignore -->
           <div class="dropdown-content">
             <button (click)="clearTool(HistogramRegion.lastRoi)">Selected ROI</button>
             <button (click)="clearTool(HistogramRegion.stackPosition)">Stack Position</button>
@@ -61,14 +62,15 @@
         <div class="row" style="justify-content: space-between;">
           <div class="col">
             <label for="registerMethodSelect" class="small-label">Method</label>
-            <select name="register-method-select" id="registerMethodSelect" ng-model="registerMethod"
-              (change)="selectRegisterMethod(registerMethodSelect.value)" #registerMethodSelect>
-              <option *ngFor="let v of [1, 2, 3, 4, 5, 6, 7, 8]" value={{v}} [selected]="registerMethod === ''+v">{{v}}
+            <select name="register-method-select" id="registerMethodSelect" ng-model="registration.registerMethod"
+              (change)="registration.selectRegisterMethod(registerMethodSelect.value)" #registerMethodSelect>
+              <option *ngFor="let v of [1, 2, 3, 4, 5, 6, 7, 8]" value={{v}}
+                [selected]="registration.registerMethod === ''+v">{{v}}
               </option>
             </select>
           </div>
-          <button (click)="registerImages()"
-            [disabled]="isLoadingRegistration || !imageDataLeft.loaded || !imageDataRight.loaded">
+          <button (click)="registration.registerImages()"
+            [disabled]="registration.isLoadingRegistration || !imageDataLeft.loaded || !imageDataRight.loaded">
             {{isLoadingRegistration ? 'Loading': 'Register'}}
           </button>
           <button (click)="resetStackPosition()" [disabled]="!imageDataLeft.loaded || !imageDataRight.loaded">
@@ -214,13 +216,14 @@
           <h2 style="padding: 0 25px 5px 5px;">Comparison</h2>
           <button (click)="selectHistogramRegion(HistogramRegion.volume)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.volume}">Volume</button>
+            [ngClass]="{'pressed': stats.selectedHistogramRegion === HistogramRegion.volume}">Volume</button>
           <button (click)="selectHistogramRegion(HistogramRegion.stackPosition)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.stackPosition}">Stack Position</button>
+            [ngClass]="{'pressed': stats.selectedHistogramRegion === HistogramRegion.stackPosition}">Stack
+            Position</button>
           <button (click)="selectHistogramRegion(HistogramRegion.lastRoi)"
             [disabled]="imageDataLeft.loaded === false || imageDataRight.loaded === false"
-            [ngClass]="{'pressed': selectedHistogramRegion === HistogramRegion.lastRoi}">Selected ROI</button>
+            [ngClass]="{'pressed': stats.selectedHistogramRegion === HistogramRegion.lastRoi}">Selected ROI</button>
         </div>
         <div class="row" style="align-items: center;">
           <button (click)="selectHistogram(HistogramType.dist)"

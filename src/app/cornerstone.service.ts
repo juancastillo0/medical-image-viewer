@@ -8,7 +8,6 @@ import * as _cornerstoneNIFTIImageLoader from '@cornerstonejs/nifti-image-loader
 import * as _cornerstoneWebImageLoader from 'cornerstone-web-image-loader';
 import Hammer from 'hammerjs';
 import {
-  CornerstoneImage,
   CornerstoneModule,
   CornerstoneToolsModule,
   CornerstoneViewport,
@@ -18,7 +17,7 @@ import {
   SynchronizerCallback,
 } from './cornerstone-types';
 import { getBoundingBox } from './utils';
-import { ImageDataC } from './app.component';
+import { ImageState } from './image-state';
 
 export const cornerstoneTools: CornerstoneToolsModule = _cornerstoneTools;
 export const cornerstone: CornerstoneModule = _cornerstone;
@@ -58,15 +57,6 @@ type RoiSyncCallback = {
     source: HTMLElement,
     target: HTMLElement
   ) => { dx: number; dy: number };
-};
-
-export type TransformationParms = {
-  scale: number;
-  angle: number;
-  deltax: number;
-  deltay: number;
-  centerx: number;
-  centery: number;
 };
 
 (window as any).getToolFromName = getToolFromName;
@@ -196,8 +186,6 @@ export class CornerstoneService {
     (window as any).cornerstoneWADOImageLoader = cornerstoneWADOImageLoader;
     (window as any).cornerstoneWebImageLoader = cornerstoneWebImageLoader;
 
-    (window as any).imageRegistration = this.imageRegistration;
-
     function getBlobUrl(url: string): string {
       const baseUrl = window.URL || window.webkitURL;
       const blob = new Blob([`importScripts('${url}')`], {
@@ -289,9 +277,9 @@ export class CornerstoneService {
   };
 
   panZoomSynchronizer: (
-    left: ImageDataC,
-    right: ImageDataC
-  ) => SynchronizerCallback = (left: ImageDataC, right: ImageDataC) => (
+    left: ImageState,
+    right: ImageState
+  ) => SynchronizerCallback = (left: ImageState, right: ImageState) => (
     synchronizer,
     sourceElement,
     targetElement
@@ -349,10 +337,10 @@ export class CornerstoneService {
     eventData
   ) => {
     targetElement.focus();
-    this.syncronize(callbacks, targetElement, sourceElement);
+    this.syncronizeRois(callbacks, targetElement, sourceElement);
   };
 
-  syncronize = (
+  syncronizeRois = (
     callbacks: RoiSyncCallback,
     targetElement: HTMLElement,
     sourceElement: HTMLElement
@@ -476,51 +464,6 @@ export class CornerstoneService {
           }
         }
         cornerstone.updateImage(sourceElement);
-        // cornerstoneTools.clearToolState(sourceElement, ToolName.FreehandRoi);
-        // addData(sourceElement, targetRois);
-
-        // if (targetRois.length > sourceRois.length) {
-        //   cornerstoneTools.clearToolState(targetElement, ToolName.FreehandRoi);
-        //   for (const d of targetRois) {
-        //     cornerstoneTools.addToolState(targetElement, ToolName.FreehandRoi, d);
-        //   }
-        // }
-        // const toRemove =
-        //   sourceRois.length > targetRois.length ? targetElement : sourceElement;
-        // const data =
-        //   sourceRois.length > targetRois.length ? sourceRois : targetRois;
-        // cornerstoneTools.clearToolState(toRemove, ToolName.FreehandRoi);
-        // addData(toRemove, data);
-        // } else {
-        //   console.log('same size');
-        //   for (let i = 0; i < targetRois.length; i++) {
-        //     const dataTarget = targetRois[i];
-        //     const dataSource = sourceRois[i];
-
-        //     if (dataTarget.area > 0.1 || dataTarget.canComplete) {
-        //       const didUpdate = callbacks.onUpdateCompleted(
-        //         dataTarget,
-        //         targetElement
-        //       );
-        //       if (didUpdate) {
-        //         dataSource.handles.points = dataTarget.handles.points.map(
-        //           (p) => ({
-        //             ...p,
-        //             x: p.x * ratio,
-        //             y: p.y * ratio,
-        //           })
-        //         );
-        //         callbacks.onUpdateCompleted(dataSource, sourceElement);
-        //       }
-        //     } else {
-        //       dataSource.visible = true;
-        //       dataSource.handles.points = dataTarget.handles.points.map((p) => ({
-        //         ...p,
-        //         x: p.x * ratio,
-        //         y: p.y * ratio,
-        //       }));
-        //     }
-        //   }
       }
       // TODO: verify for images with different sizes
       (cornerstoneTools.getToolForElement(
@@ -575,74 +518,6 @@ export class CornerstoneService {
       visible: visibility,
       polyBoundingBox: getBoundingBox(points),
     };
-  };
-
-  imageRegistration = async (
-    elemLeft: HTMLDivElement,
-    elemRight: HTMLDivElement,
-    options: { method: string }
-  ) => {
-    const toBlob = (canvas: HTMLCanvasElement) => {
-      return new Promise<Blob | null>((r) => {
-        canvas.toBlob(r);
-      });
-    };
-    const imLeft = cornerstone.getImage(elemLeft);
-    const imRight = cornerstone.getImage(elemRight);
-    const blobs = await Promise.all([
-      toBlob(elemLeft.querySelector('canvas')),
-      toBlob(elemRight.querySelector('canvas')),
-    ]);
-    const formData = new FormData();
-    // formData.append('cut1', blobs[0]);
-    // formData.append('cut2', blobs[1]);
-    formData.append(
-      'cut1',
-      new Blob([((imLeft.getPixelData() as any) as Uint16Array).buffer], {
-        type: 'application/octet-stream',
-      })
-    );
-    formData.append(
-      'cut2',
-      new Blob([((imRight.getPixelData() as any) as Uint16Array).buffer], {
-        type: 'application/octet-stream',
-      })
-    );
-
-    const queryParams = `?lw=${imLeft.width}&lh=${imLeft.height}&rw=${imRight.width}&rh=${imRight.height}&method=${options.method}`;
-
-    const response = await fetch(
-      `http://127.0.0.1:5000/files/registration${queryParams}`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
-
-    let data: CornerstoneImage | TransformationParms;
-    if (response.ok) {
-      console.log(response);
-      console.log(response.headers.get('Content-Type'));
-      if (response.headers.get('Content-Type') === 'application/json') {
-        data = await response.json();
-      } else {
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        data = await cornerstoneWebImageLoader.loadImage(blobUrl).promise;
-      }
-      console.log(data);
-    }
-    return { response, data };
-  };
-
-  rotateViewport = () => {
-    // const viewport = cornerstone.getViewport(element);
-    // viewport.rotation -= 5;
-    // cornerstone.setViewport(element, viewport);
-    // titulo
-    // abstract
-    // imagen
-    // video 3min
   };
 
   stackImageIndexSynchronizer: SynchronizerCallback = (
@@ -721,39 +596,3 @@ export class CornerstoneService {
     );
   };
 }
-
-// let _x = Math.round(bbox.left);
-// const xs = Array(Math.round(bbox.width)).map((_) => _x++);
-// for (let y = bbox.top; y < bbox.top + bbox.height; y++) {
-//   this.cornerstoneService
-//     .lineInFreehand(y, leftData.points, xs)
-//     .map((inFreehand, ii) => {
-//       if (inFreehand) {
-//         const x = _x[ii];
-//         const diff = left[index] - right[index];
-//         if (isNaN(diff)) {
-//           console.log(
-//             x,
-//             y,
-//             index,
-//             left[index],
-//             right[index],
-//             left.length,
-//             right.length
-//           );
-//         }
-//         maxDiff = Math.max(maxDiff, diff);
-//         minDiff = Math.min(minDiff, diff);
-//         sumDiff += diff;
-
-//         differencePixels.push({
-//           left: left[index],
-//           right: right[index],
-//           index:
-//             Math.round(y) * data.dynamicImage.width + Math.round(x),
-//           diff,
-//         });
-//       }
-//       index++;
-//     });
-// }
