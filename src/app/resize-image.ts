@@ -18,7 +18,7 @@ export const resizeImage = (
       [size.h, size.w, 1],
       'float32'
     );
-    return tf.image.resizeNearestNeighbor(tensor, [newSize.h, newSize.w]);
+    return tf.image.resizeBilinear(tensor, [newSize.h, newSize.w]);
   });
   return imageTensor;
 };
